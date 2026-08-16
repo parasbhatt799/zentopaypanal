@@ -96,6 +96,8 @@ interface AuthContextType {
   toggleTheme: () => void;
   fundRequests: FundRequest[];
   submitFundRequest: (amount: number, utrNumber: string, proofUrl?: string | null, adminBankAccountId?: string | null) => Promise<FundRequest>;
+  isProfileModalOpen: boolean;
+  setIsProfileModalOpen: (open: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -143,6 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return [];
     }
   });
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('zentopay_theme');
@@ -1205,6 +1208,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toggleTheme,
         fundRequests,
         submitFundRequest,
+        isProfileModalOpen,
+        setIsProfileModalOpen,
       }}
     >
       {children}
