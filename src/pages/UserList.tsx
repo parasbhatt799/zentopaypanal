@@ -82,7 +82,8 @@ export const UserList: React.FC = () => {
   const [email, setEmail] = useState('');
   const [xApiKey, setXApiKey] = useState('');
   const [xSecretKey, setXSecretKey] = useState('');
-  const [walletBalance, setWalletBalance] = useState('25000');
+  const [walletBalance, setWalletBalance] = useState('0');
+  const [b2bAgentId, setB2BAgentId] = useState('');
   const [userRole, setUserRole] = useState<UserRole>('user');
 
   // Edit User Modal State
@@ -163,7 +164,8 @@ export const UserList: React.FC = () => {
       x_api_key: xApiKey,
       x_secret_key: xSecretKey,
       role: userRole,
-      wallet_balance: parseFloat(walletBalance || '25000'),
+      wallet_balance: 0,
+      b2b_agent_id: b2bAgentId,
     });
 
     // Reset Form & Show Credentials Modal
@@ -172,7 +174,7 @@ export const UserList: React.FC = () => {
     setEmail('');
     setXApiKey('');
     setXSecretKey('');
-    setWalletBalance('25000');
+    setB2BAgentId('');
     setIsAddModalOpen(false);
 
     setCreatedCredentials({
@@ -209,7 +211,11 @@ export const UserList: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => {
+            const randomId = `zentopay${Math.floor(10000 + Math.random() * 90000)}`;
+            setB2BAgentId(randomId);
+            setIsAddModalOpen(true);
+          }}
           className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center space-x-2 transition-all shrink-0"
         >
           <UserPlus className="h-4 w-4" />
@@ -483,14 +489,15 @@ export const UserList: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
-                    Initial Balance (₹)
+                    B2B Agent ID
                   </label>
                   <input
-                    type="number"
-                    value={walletBalance}
-                    onChange={(e) => setWalletBalance(e.target.value)}
-                    placeholder="25000"
+                    type="text"
+                    value={b2bAgentId}
+                    onChange={(e) => setB2BAgentId(e.target.value)}
+                    placeholder="zentopay12345"
                     className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono"
+                    required
                   />
                 </div>
 
