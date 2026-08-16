@@ -1,0 +1,712 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-bg: #0b0f19;
+    --color-card: rgba(18, 24, 38, 0.75);
+    --color-border: rgba(255, 255, 255, 0.08);
+  }
+
+  body {
+    background: linear-gradient(180deg, #090514 0%, #0c081f 45%, #050510 100%) !important;
+    color: var(--color-text-primary, #f3f4f6);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Glassmorphism utility classes */
+.glass-panel {
+  background: rgba(18, 24, 38, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-input {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+
+/* Metallic Credit Card Effect */
+.card-gradient-hdfc {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 45%, #0f172a 100%);
+}
+
+.card-gradient-icici {
+  background: linear-gradient(135deg, #991b1b 0%, #7f1d1d 50%, #1e1b4b 100%);
+}
+
+.card-gradient-sbi {
+  background: linear-gradient(135deg, #065f46 0%, #047857 50%, #0f172a 100%);
+}
+
+.card-gradient-gold {
+  background: linear-gradient(135deg, #78350f 0%, #b45309 40%, #1e1b4b 100%);
+}
+
+/* Pulsing aura */
+@keyframes pulse-slow {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-slow 4s infinite ease-in-out;
+}
+
+/* Light Mode Theme Overrides */
+.light {
+  --color-bg: #f8fafc;
+  --color-card: rgba(255, 255, 255, 0.95);
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-panel-bg: rgba(255, 255, 255, 0.95);
+  --color-panel-border: rgba(0, 0, 0, 0.08);
+  --color-card-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.95) 100%);
+  --color-input-bg: rgba(255, 255, 255, 0.98);
+  --color-input-border: rgba(0, 0, 0, 0.15);
+}
+
+.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Base headings in light mode */
+.light h1,
+.light h2,
+.light h3,
+.light h4,
+.light h5,
+.light h6 {
+  color: #0f172a !important;
+}
+
+/* Layout overrides */
+.light .bg-slate-950 {
+  background-color: #f8fafc !important;
+}
+
+.light .bg-slate-900 {
+  background-color: #f1f5f9 !important;
+}
+
+.light .bg-slate-900\/60 {
+  background-color: rgba(241, 245, 249, 0.6) !important;
+}
+
+.light .bg-slate-900\/80 {
+  background-color: rgba(241, 245, 249, 0.8) !important;
+}
+
+.light .bg-slate-900\/90 {
+  background-color: rgba(241, 245, 249, 0.9) !important;
+}
+
+.light .bg-slate-800 {
+  background-color: #e2e8f0 !important;
+}
+
+.light .bg-slate-800\/80 {
+  background-color: rgba(226, 232, 240, 0.8) !important;
+}
+
+.light .bg-slate-800\/50 {
+  background-color: rgba(226, 232, 240, 0.5) !important;
+}
+
+.light .bg-slate-950\/40 {
+  background-color: rgba(226, 232, 240, 0.4) !important;
+}
+
+.light .bg-slate-950\/20 {
+  background-color: rgba(226, 232, 240, 0.2) !important;
+}
+
+.light .bg-slate-950\/60 {
+  background-color: #ffffff !important;
+}
+
+.light .hover\:bg-slate-800\/50:hover {
+  background-color: rgba(226, 232, 240, 0.5) !important;
+}
+
+.light .hover\:bg-slate-900\/10:hover {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+.light .bg-slate-900\/40 {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02) !important;
+}
+
+.light .bg-slate-900\/50 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.light .bg-emerald-950\/25 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+
+.light .text-amber-500\/80 {
+  color: #d97706 !important;
+}
+
+.light .text-emerald-500\/80 {
+  color: #059669 !important;
+}
+
+/* Active layout highlights */
+.light .bg-indigo-600\/20 {
+  background-color: rgba(79, 70, 229, 0.12) !important;
+  color: #4f46e5 !important;
+  border-color: rgba(79, 70, 229, 0.25) !important;
+}
+
+/* Borders */
+.light .border-slate-800 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.light .border-slate-800\/80 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.light .border-slate-800\/40 {
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.light .border-slate-700 {
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.light .border-slate-700\/60 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.light .border-slate-900 {
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.light .border-slate-900\/60 {
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.light .divide-slate-800\/60> :not([hidden])~ :not([hidden]) {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Text colors without affecting buttons/metallic credit cards */
+.light .text-white:not(button):not(button *):not(.card-gradient-hdfc *):not(.card-gradient-icici *):not(.card-gradient-sbi *):not(.card-gradient-gold *) {
+  color: #0f172a !important;
+}
+
+.light .text-slate-100:not(button):not(button *):not(.card-gradient-hdfc *):not(.card-gradient-icici *):not(.card-gradient-sbi *):not(.card-gradient-gold *) {
+  color: #1e293b !important;
+}
+
+.light .text-slate-200:not(button):not(button *):not(.card-gradient-hdfc *):not(.card-gradient-icici *):not(.card-gradient-sbi *):not(.card-gradient-gold *) {
+  color: #334155 !important;
+}
+
+.light .text-slate-300:not(button):not(button *):not(.card-gradient-hdfc *):not(.card-gradient-icici *):not(.card-gradient-sbi *):not(.card-gradient-gold *) {
+  color: #475569 !important;
+}
+
+.light .text-slate-400 {
+  color: #556276 !important;
+}
+
+.light .text-slate-500 {
+  color: #8190a6 !important;
+}
+
+/* StatCard overrides */
+.light .stat-card {
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+/* Indigo Card */
+.light .stat-card-indigo {
+  background: linear-gradient(135deg, rgba(240, 244, 255, 0.9) 0%, rgba(224, 231, 255, 0.9) 100%) !important;
+  border-color: rgba(99, 102, 241, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.08), 0 8px 10px -6px rgba(99, 102, 241, 0.05) !important;
+}
+.light .stat-card-indigo .stat-card-icon {
+  background-color: rgba(99, 102, 241, 0.12) !important;
+  border-color: rgba(99, 102, 241, 0.25) !important;
+  color: #4f46e5 !important;
+}
+.light .stat-card-indigo .stat-card-icon * {
+  color: #4f46e5 !important;
+}
+
+/* Emerald Card */
+.light .stat-card-emerald {
+  background: linear-gradient(135deg, rgba(236, 253, 245, 0.9) 0%, rgba(209, 250, 229, 0.9) 100%) !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.08), 0 8px 10px -6px rgba(16, 185, 129, 0.05) !important;
+}
+.light .stat-card-emerald .stat-card-icon {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+  color: #059669 !important;
+}
+.light .stat-card-emerald .stat-card-icon * {
+  color: #059669 !important;
+}
+
+/* Purple Card */
+.light .stat-card-purple {
+  background: linear-gradient(135deg, rgba(245, 243, 255, 0.9) 0%, rgba(237, 233, 254, 0.9) 100%) !important;
+  border-color: rgba(139, 92, 246, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.08), 0 8px 10px -6px rgba(139, 92, 246, 0.05) !important;
+}
+.light .stat-card-purple .stat-card-icon {
+  background-color: rgba(139, 92, 246, 0.12) !important;
+  border-color: rgba(139, 92, 246, 0.25) !important;
+  color: #7c3aed !important;
+}
+.light .stat-card-purple .stat-card-icon * {
+  color: #7c3aed !important;
+}
+
+/* Amber Card */
+.light .stat-card-amber {
+  background: linear-gradient(135deg, rgba(254, 252, 232, 0.9) 0%, rgba(254, 249, 195, 0.9) 100%) !important;
+  border-color: rgba(245, 158, 11, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.08), 0 8px 10px -6px rgba(245, 158, 11, 0.05) !important;
+}
+.light .stat-card-amber .stat-card-icon {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.25) !important;
+  color: #d97706 !important;
+}
+.light .stat-card-amber .stat-card-icon * {
+  color: #d97706 !important;
+}
+
+/* Rose Card */
+.light .stat-card-rose {
+  background: linear-gradient(135deg, rgba(255, 241, 242, 0.9) 0%, rgba(255, 228, 230, 0.9) 100%) !important;
+  border-color: rgba(244, 63, 94, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(244, 63, 94, 0.08), 0 8px 10px -6px rgba(244, 63, 94, 0.05) !important;
+}
+.light .stat-card-rose .stat-card-icon {
+  background-color: rgba(244, 63, 94, 0.12) !important;
+  border-color: rgba(244, 63, 94, 0.25) !important;
+  color: #e11d48 !important;
+}
+.light .stat-card-rose .stat-card-icon * {
+  color: #e11d48 !important;
+}
+
+/* Sky Card */
+.light .stat-card-sky {
+  background: linear-gradient(135deg, rgba(240, 249, 255, 0.9) 0%, rgba(224, 242, 254, 0.9) 100%) !important;
+  border-color: rgba(56, 189, 248, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.08), 0 8px 10px -6px rgba(56, 189, 248, 0.05) !important;
+}
+.light .stat-card-sky .stat-card-icon {
+  background-color: rgba(56, 189, 248, 0.12) !important;
+  border-color: rgba(56, 189, 248, 0.25) !important;
+  color: #0284c7 !important;
+}
+.light .stat-card-sky .stat-card-icon * {
+  color: #0284c7 !important;
+}
+
+/* Teal Card */
+.light .stat-card-teal {
+  background: linear-gradient(135deg, rgba(240, 253, 250, 0.9) 0%, rgba(204, 251, 241, 0.9) 100%) !important;
+  border-color: rgba(20, 184, 166, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(20, 184, 166, 0.08), 0 8px 10px -6px rgba(20, 184, 166, 0.05) !important;
+}
+.light .stat-card-teal .stat-card-icon {
+  background-color: rgba(20, 184, 166, 0.12) !important;
+  border-color: rgba(20, 184, 166, 0.25) !important;
+  color: #0d9488 !important;
+}
+.light .stat-card-teal .stat-card-icon * {
+  color: #0d9488 !important;
+}
+
+/* Blue Card */
+.light .stat-card-blue {
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.9) 0%, rgba(219, 234, 254, 0.9) 100%) !important;
+  border-color: rgba(59, 130, 246, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.08), 0 8px 10px -6px rgba(59, 130, 246, 0.05) !important;
+}
+.light .stat-card-blue .stat-card-icon {
+  background-color: rgba(59, 130, 246, 0.12) !important;
+  border-color: rgba(59, 130, 246, 0.25) !important;
+  color: #2563eb !important;
+}
+.light .stat-card-blue .stat-card-icon * {
+  color: #2563eb !important;
+}
+
+/* Orange Card */
+.light .stat-card-orange {
+  background: linear-gradient(135deg, rgba(255, 247, 237, 0.9) 0%, rgba(254, 237, 222, 0.9) 100%) !important;
+  border-color: rgba(249, 115, 22, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.08), 0 8px 10px -6px rgba(249, 115, 22, 0.05) !important;
+}
+.light .stat-card-orange .stat-card-icon {
+  background-color: rgba(249, 115, 22, 0.12) !important;
+  border-color: rgba(249, 115, 22, 0.25) !important;
+  color: #ea580c !important;
+}
+.light .stat-card-orange .stat-card-icon * {
+  color: #ea580c !important;
+}
+
+/* Pink Card */
+.light .stat-card-pink {
+  background: linear-gradient(135deg, rgba(253, 244, 245, 0.9) 0%, rgba(252, 231, 233, 0.9) 100%) !important;
+  border-color: rgba(236, 72, 153, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(236, 72, 153, 0.08), 0 8px 10px -6px rgba(236, 72, 153, 0.05) !important;
+}
+.light .stat-card-pink .stat-card-icon {
+  background-color: rgba(236, 72, 153, 0.12) !important;
+  border-color: rgba(236, 72, 153, 0.25) !important;
+  color: #db2777 !important;
+}
+.light .stat-card-pink .stat-card-icon * {
+  color: #db2777 !important;
+}
+
+/* Glassmorphism custom light overrides */
+.light .glass-panel {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05) !important;
+}
+
+.light .glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 247, 250, 0.98) 100%) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.light .glass-input {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  color: #0f172a !important;
+}
+
+.light .glass-input:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Modals */
+.light .bg-black\/80 {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.light .bg-slate-900\/90 {
+  background-color: rgba(241, 245, 249, 0.95) !important;
+}
+
+/* Tables and directories */
+.light .hover\:bg-slate-800\/30:hover {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+.light .bg-slate-800\/30 {
+  background-color: rgba(0, 0, 0, 0.02) !important;
+}
+
+.light .text-indigo-300 {
+  color: #4f46e5 !important;
+}
+
+.light .text-indigo-400 {
+  color: #6366f1 !important;
+}
+
+.light .text-purple-300 {
+  color: #7c3aed !important;
+}
+
+.light .text-purple-400 {
+  color: #8b5cf6 !important;
+}
+
+.light .text-amber-300 {
+  color: #d97706 !important;
+}
+
+.light .text-amber-400 {
+  color: #f59e0b !important;
+}
+
+.light .text-emerald-400 {
+  color: #059669 !important;
+}
+
+.light .text-rose-400 {
+  color: #dc2626 !important;
+}
+
+/* Button overrides in light mode */
+.light button.bg-slate-800,
+.light button.bg-slate-800\/80 {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light button.bg-slate-800 *,
+.light button.bg-slate-800\/80 * {
+  color: inherit !important;
+}
+
+.light button.bg-slate-800:hover,
+.light button.bg-slate-800\/80:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Make table row borders very soft and light in light mode */
+.light table,
+.light tr,
+.light td,
+.light th,
+.light tbody,
+.light thead {
+  border-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Animated Blobs for Premium Dynamic Background */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.95);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 10s infinite alternate ease-in-out;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* Premium Custom Login Card styles */
+.login-card {
+  background: linear-gradient(135deg, rgba(16, 11, 35, 0.72) 0%, rgba(8, 8, 20, 0.88) 100%) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(139, 92, 246, 0.22) !important;
+  box-shadow: 
+    0 25px 60px -15px rgba(0, 0, 0, 0.8), 
+    0 0 50px -5px rgba(139, 92, 246, 0.16) !important;
+  border-radius: 1.5rem !important;
+  transition: all 0.4s ease;
+}
+
+.login-input {
+  background: rgba(8, 5, 22, 0.6) !important;
+  border: 1px solid rgba(139, 92, 246, 0.18) !important;
+  color: #f8fafc !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.login-input:focus {
+  outline: none !important;
+  border-color: rgba(139, 92, 246, 0.65) !important;
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.25) !important;
+  background: rgba(12, 8, 30, 0.8) !important;
+}
+
+/* Hide number input spinners (arrows) globally */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Light Mode Sidebar Overrides: Navy Blue Background */
+.light .sidebar-aside {
+  background-color: #0b1329 !important; /* Deep Navy Blue */
+  background-image: linear-gradient(180deg, #0b1329 0%, #0d1b3e 100%) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.light .sidebar-aside .text-slate-500 {
+  color: #64748b !important; /* Muted category label */
+}
+
+/* Inactive menu items styling */
+.light .sidebar-aside button:not(.bg-indigo-600\/20) {
+  color: #94a3b8 !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+.light .sidebar-aside button:not(.bg-indigo-600\/20) * {
+  color: #94a3b8 !important;
+}
+
+/* Hover state for inactive menu items */
+.light .sidebar-aside button:not(.bg-indigo-600\/20):hover {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.light .sidebar-aside button:not(.bg-indigo-600\/20):hover * {
+  color: #ffffff !important;
+}
+
+/* Active menu items styling */
+.light .sidebar-aside button.bg-indigo-600\/20 {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  color: #818cf8 !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+.light .sidebar-aside button.bg-indigo-600\/20 * {
+  color: #818cf8 !important;
+}
+
+/* Maintenance section styling */
+.light .sidebar-aside .glass-card {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.light .sidebar-aside .glass-card .text-slate-200 {
+  color: #e2e8f0 !important;
+}
+
+.light .sidebar-aside .glass-card .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+.light .sidebar-aside .glass-card button.bg-slate-800 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.light .sidebar-aside .glass-card button.bg-slate-800:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Light Mode Login Card overrides */
+.light .login-card {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 
+    0 25px 60px -15px rgba(0, 0, 0, 0.08), 
+    0 0 50px -5px rgba(79, 70, 229, 0.06) !important;
+}
+
+.light .login-input {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  color: #0f172a !important;
+}
+
+.light .login-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+.light .login-input:focus {
+  border-color: rgba(79, 70, 229, 0.5) !important;
+  box-shadow: 0 0 15px rgba(79, 70, 229, 0.15) !important;
+  background: #ffffff !important;
+}
+
+.light .login-card label {
+  color: #475569 !important;
+}
+
+.light .login-card p {
+  color: #64748b !important;
+}
+
+.light .login-card .text-slate-400 {
+  color: #64748b !important;
+}
+
+.light .login-card .text-slate-300 {
+  color: #475569 !important;
+}
+
+.light .login-card .text-slate-200 {
+  color: #1e293b !important;
+}
+
+/* Day Mode logo white text visibility override */
+.light .login-card img[alt="ZentoPay Logo"] {
+  filter: invert(1) hue-rotate(180deg);
+}
