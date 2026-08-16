@@ -200,8 +200,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* My Profile Modal */}
       {isProfileModalOpen && currentUser && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => setIsProfileModalOpen(false)}
               className="absolute right-4 top-4 p-2 text-slate-400 hover:text-white transition-colors"
