@@ -62,7 +62,8 @@ interface AuthContextType {
     phone: string;
     email: string;
     role: UserRole;
-    wallet_balance: number;
+    wallet_balance?: number;
+    b2b_agent_id?: string;
     x_api_key?: string;
     x_secret_key?: string;
     password?: string;
@@ -392,7 +393,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           b2b_sync_status: newUser.b2b_sync_status,
           role: newUser.role,
           status: newUser.status,
-          wallet_balance: newUser.wallet_balance,
           x_api_key: newUser.x_api_key,
           x_secret_key: newUser.x_secret_key,
         }).select();
@@ -602,16 +602,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateUser = async (userId: string, data: {
-    full_name: string;
-    phone: string;
-    email: string;
-    role: UserRole;
-    wallet_balance: number;
-    x_api_key?: string;
-    x_secret_key?: string;
-    password?: string;
-  }) => {
+  const updateUser = async (
+    userId: string,
+    data: {
+      full_name: string;
+      phone: string;
+      email: string;
+      role: UserRole;
+      wallet_balance?: number;
+      b2b_agent_id?: string;
+      x_api_key?: string;
+      x_secret_key?: string;
+      password?: string;
+    }
+  ) => {
     const cleanPhone = data.phone.replace(/\D/g, '');
     const updatedUsers = users.map((u) => {
       if (u.id === userId) {
@@ -621,7 +625,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           phone: cleanPhone,
           email: data.email,
           role: data.role,
-          wallet_balance: data.wallet_balance,
+          wallet_balance: typeof data.wallet_balance !== 'undefined' ? data.wallet_balance : u.wallet_balance,
+          b2b_agent_id: typeof data.b2b_agent_id !== 'undefined' ? data.b2b_agent_id : u.b2b_agent_id,
           x_api_key: data.x_api_key,
           x_secret_key: data.x_secret_key,
           ...(data.password ? { password: data.password } : {}),
@@ -643,7 +648,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           phone: updatedUser.phone,
           email: updatedUser.email,
           role: updatedUser.role,
-          wallet_balance: updatedUser.wallet_balance,
+          b2b_agent_id: updatedUser.b2b_agent_id,
           x_api_key: updatedUser.x_api_key,
           x_secret_key: updatedUser.x_secret_key,
         };

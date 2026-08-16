@@ -94,7 +94,7 @@ export const UserList: React.FC = () => {
   const [editEmail, setEditEmail] = useState('');
   const [editXApiKey, setEditXApiKey] = useState('');
   const [editXSecretKey, setEditXSecretKey] = useState('');
-  const [editWalletBalance, setEditWalletBalance] = useState('25000');
+  const [editB2BAgentId, setEditB2BAgentId] = useState('');
   const [editUserRole, setEditUserRole] = useState<UserRole>('user');
   const [editPassword, setEditPassword] = useState('');
 
@@ -112,7 +112,7 @@ export const UserList: React.FC = () => {
     setEditEmail(user.email || '');
     setEditXApiKey(user.x_api_key || '');
     setEditXSecretKey(user.x_secret_key || '');
-    setEditWalletBalance(user.wallet_balance.toString());
+    setEditB2BAgentId(user.b2b_agent_id || '');
     setEditUserRole(user.role);
     setEditPassword(user.password || 'password123');
     setIsEditModalOpen(true);
@@ -127,7 +127,7 @@ export const UserList: React.FC = () => {
       phone: editPhone,
       email: editEmail,
       role: editUserRole,
-      wallet_balance: parseFloat(editWalletBalance || '0'),
+      b2b_agent_id: editB2BAgentId,
       x_api_key: editXApiKey,
       x_secret_key: editXSecretKey,
       password: editPassword,
@@ -770,14 +770,15 @@ export const UserList: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
-                    Wallet Balance (₹)
+                    B2B Agent ID
                   </label>
                   <input
-                    type="number"
-                    value={editWalletBalance}
-                    onChange={(e) => setEditWalletBalance(e.target.value)}
-                    placeholder="25000"
+                    type="text"
+                    value={editB2BAgentId}
+                    onChange={(e) => setEditB2BAgentId(e.target.value)}
+                    placeholder="zentopay12345"
                     className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono"
+                    required
                   />
                 </div>
 

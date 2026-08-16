@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     x_api_key TEXT,
     x_secret_key TEXT,
     mpin TEXT,
-    wallet_balance NUMERIC(12, 2) DEFAULT 25000.00,
+    tpin TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
