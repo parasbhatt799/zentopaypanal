@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     address TEXT,
     firm_address TEXT,
     reference TEXT,
+    avatar_url TEXT,
     role TEXT CHECK (role IN ('admin', 'user')) DEFAULT 'user',
     status TEXT CHECK (status IN ('active', 'suspended', 'pending')) DEFAULT 'active',
     password_change_required BOOLEAN DEFAULT true,

@@ -51,6 +51,7 @@ interface AuthContextType {
     address?: string;
     firm_address?: string;
     reference?: string;
+    avatar_url?: string;
     email?: string;
     role?: UserRole;
     wallet_balance?: number;
@@ -72,6 +73,7 @@ interface AuthContextType {
     address?: string;
     firm_address?: string;
     reference?: string;
+    avatar_url?: string;
     email: string;
     role: UserRole;
     wallet_balance?: number;
@@ -341,6 +343,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     address?: string;
     firm_address?: string;
     reference?: string;
+    avatar_url?: string;
     email?: string;
     role?: UserRole;
     wallet_balance?: number;
@@ -373,6 +376,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       address: data.address || '',
       firm_address: data.firm_address || '',
       reference: data.reference || '',
+      avatar_url: data.avatar_url || '',
       email: userEmail,
       password: generatedPassword,
       password_change_required: true,
@@ -426,6 +430,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           address: newUser.address,
           firm_address: newUser.firm_address,
           reference: newUser.reference,
+          avatar_url: newUser.avatar_url,
           password: newUser.password,
           password_change_required: newUser.password_change_required,
           b2b_agent_id: newUser.b2b_agent_id,
@@ -652,6 +657,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       address?: string;
       firm_address?: string;
       reference?: string;
+      avatar_url?: string;
       email: string;
       role: UserRole;
       wallet_balance?: number;
@@ -681,6 +687,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           address: typeof data.address !== 'undefined' ? data.address : u.address,
           firm_address: typeof data.firm_address !== 'undefined' ? data.firm_address : u.firm_address,
           reference: typeof data.reference !== 'undefined' ? data.reference : u.reference,
+          avatar_url: typeof data.avatar_url !== 'undefined' ? data.avatar_url : u.avatar_url,
           email: data.email,
           role: data.role,
           wallet_balance: typeof data.wallet_balance !== 'undefined' ? data.wallet_balance : u.wallet_balance,
@@ -711,6 +718,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           address: updatedUser.address,
           firm_address: updatedUser.firm_address,
           reference: updatedUser.reference,
+          avatar_url: updatedUser.avatar_url,
           email: updatedUser.email,
           role: updatedUser.role,
           b2b_agent_id: updatedUser.b2b_agent_id,

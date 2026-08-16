@@ -15,6 +15,7 @@ export interface UserProfile {
   address?: string;
   firm_address?: string;
   reference?: string;
+  avatar_url?: string;
   password?: string;
   password_change_required?: boolean;
   mpin?: string;

@@ -372,8 +372,12 @@ export const UserList: React.FC = () => {
                 <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="py-3.5 px-4">
                     <div className="flex items-center space-x-3">
-                      <div className="h-9 w-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-indigo-400 text-sm">
-                        {u.full_name.charAt(0)}
+                      <div className="h-9 w-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 font-bold text-indigo-400 text-sm">
+                        {u.avatar_url ? (
+                          <img src={u.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                        ) : (
+                          u.full_name.charAt(0).toUpperCase()
+                        )}
                       </div>
                       <div>
                         <p className="font-semibold text-slate-100">{u.full_name}</p>
