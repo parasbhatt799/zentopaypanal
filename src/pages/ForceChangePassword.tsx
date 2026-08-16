@@ -13,8 +13,8 @@ export const ForceChangePassword: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (!newPassword || newPassword.length < 6) {
-      setError('Password must be at least 6 characters long.');
+    if (!newPassword || newPassword.length < 8) {
+      setError('Password must be at least 8 characters long.');
       return;
     }
 

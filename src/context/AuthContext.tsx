@@ -331,7 +331,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     b2b_agent_id?: string;
   }) => {
     const cleanPhone = data.phone.replace(/\D/g, '');
-    const generatedPassword = `ZP#${Math.floor(1000 + Math.random() * 9000)}`;
+    const generatedPassword = `ZP#${Math.floor(10000 + Math.random() * 90000)}`;
     const userEmail = data.email && data.email.trim() ? data.email.trim() : `${cleanPhone}@zentopay.com`;
 
     // Generate B2B Agent ID automatically if not provided

@@ -54,10 +54,10 @@ export const ChangePassword: React.FC = () => {
     }
 
     // Validate length
-    if (newPassword.length < 6) {
-      setError('New password must be at least 6 characters long.');
-      return;
-    }
+    if (newPassword.length < 8) {
+       setError('New password must be at least 8 characters long.');
+       return;
+     }
 
     // Check same password
     if (newPassword === currentPassword) {
