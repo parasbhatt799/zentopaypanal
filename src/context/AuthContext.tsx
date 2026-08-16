@@ -43,8 +43,14 @@ interface AuthContextType {
   login: (identifier: string, passwordText?: string, role?: UserRole, mpinText?: string) => void;
   logout: () => void;
   createNewUser: (data: {
-    full_name: string;
+    first_name: string;
+    middle_name?: string;
+    last_name: string;
     phone: string;
+    alt_phone?: string;
+    address?: string;
+    firm_address?: string;
+    reference?: string;
     email?: string;
     role?: UserRole;
     wallet_balance?: number;
@@ -58,8 +64,14 @@ interface AuthContextType {
   toggleUserStatus: (userId: string) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   updateUser: (userId: string, data: {
-    full_name: string;
+    first_name?: string;
+    middle_name?: string;
+    last_name?: string;
     phone: string;
+    alt_phone?: string;
+    address?: string;
+    firm_address?: string;
+    reference?: string;
     email: string;
     role: UserRole;
     wallet_balance?: number;
@@ -321,8 +333,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const createNewUser = async (data: {
-    full_name: string;
+    first_name: string;
+    middle_name?: string;
+    last_name: string;
     phone: string;
+    alt_phone?: string;
+    address?: string;
+    firm_address?: string;
+    reference?: string;
     email?: string;
     role?: UserRole;
     wallet_balance?: number;
@@ -331,16 +349,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     b2b_agent_id?: string;
   }) => {
     const cleanPhone = data.phone.replace(/\D/g, '');
+    const cleanAltPhone = data.alt_phone ? data.alt_phone.replace(/\D/g, '') : '';
     const generatedPassword = `ZP#${Math.floor(10000 + Math.random() * 90000)}`;
     const userEmail = data.email && data.email.trim() ? data.email.trim() : `${cleanPhone}@zentopay.com`;
 
     // Generate B2B Agent ID automatically if not provided
-    const assignedB2BAgentId = data.b2b_agent_id || `zentopay${Math.floor(10000 + Math.random() * 90000)}`;
+    let assignedB2BAgentId = data.b2b_agent_id || '';
+    if (!assignedB2BAgentId) {
+      const randDigits = Math.floor(10000 + Math.random() * 90000);
+      assignedB2BAgentId = `zentopay${randDigits}`;
+    }
+
+    const constructedFullName = `${data.first_name} ${data.middle_name || ''} ${data.last_name}`.replace(/\s+/g, ' ').trim();
 
     const newUser: UserProfile = {
       id: `u-${Date.now()}`,
-      full_name: data.full_name,
+      full_name: constructedFullName,
+      first_name: data.first_name,
+      middle_name: data.middle_name || '',
+      last_name: data.last_name,
       phone: cleanPhone,
+      alt_phone: cleanAltPhone,
+      address: data.address || '',
+      firm_address: data.firm_address || '',
+      reference: data.reference || '',
       email: userEmail,
       password: generatedPassword,
       password_change_required: true,
@@ -348,7 +380,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       b2b_sync_status: 'synced',
       role: data.role || 'user',
       status: 'active',
-      wallet_balance: data.wallet_balance || 25000,
+      wallet_balance: 0,
       x_api_key: data.x_api_key,
       x_secret_key: data.x_secret_key,
       created_at: new Date().toISOString(),
@@ -386,7 +418,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data, error } = await supabase.from('profiles').insert({
           email: newUser.email,
           full_name: newUser.full_name,
+          first_name: newUser.first_name,
+          middle_name: newUser.middle_name,
+          last_name: newUser.last_name,
           phone: newUser.phone,
+          alt_phone: newUser.alt_phone,
+          address: newUser.address,
+          firm_address: newUser.firm_address,
+          reference: newUser.reference,
           password: newUser.password,
           password_change_required: newUser.password_change_required,
           b2b_agent_id: newUser.b2b_agent_id,
@@ -605,8 +644,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUser = async (
     userId: string,
     data: {
-      full_name: string;
+      first_name?: string;
+      middle_name?: string;
+      last_name?: string;
       phone: string;
+      alt_phone?: string;
+      address?: string;
+      firm_address?: string;
+      reference?: string;
       email: string;
       role: UserRole;
       wallet_balance?: number;
@@ -617,12 +662,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   ) => {
     const cleanPhone = data.phone.replace(/\D/g, '');
+    const cleanAltPhone = data.alt_phone ? data.alt_phone.replace(/\D/g, '') : '';
     const updatedUsers = users.map((u) => {
       if (u.id === userId) {
+        const fName = typeof data.first_name !== 'undefined' ? data.first_name : (u.first_name || '');
+        const mName = typeof data.middle_name !== 'undefined' ? data.middle_name : (u.middle_name || '');
+        const lName = typeof data.last_name !== 'undefined' ? data.last_name : (u.last_name || '');
+        const constructedFullName = `${fName} ${mName} ${lName}`.replace(/\s+/g, ' ').trim();
+
         return {
           ...u,
-          full_name: data.full_name,
+          full_name: constructedFullName,
+          first_name: fName,
+          middle_name: mName,
+          last_name: lName,
           phone: cleanPhone,
+          alt_phone: cleanAltPhone,
+          address: typeof data.address !== 'undefined' ? data.address : u.address,
+          firm_address: typeof data.firm_address !== 'undefined' ? data.firm_address : u.firm_address,
+          reference: typeof data.reference !== 'undefined' ? data.reference : u.reference,
           email: data.email,
           role: data.role,
           wallet_balance: typeof data.wallet_balance !== 'undefined' ? data.wallet_balance : u.wallet_balance,
@@ -645,7 +703,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const updatePayload: any = {
           full_name: updatedUser.full_name,
+          first_name: updatedUser.first_name,
+          middle_name: updatedUser.middle_name,
+          last_name: updatedUser.last_name,
           phone: updatedUser.phone,
+          alt_phone: updatedUser.alt_phone,
+          address: updatedUser.address,
+          firm_address: updatedUser.firm_address,
+          reference: updatedUser.reference,
           email: updatedUser.email,
           role: updatedUser.role,
           b2b_agent_id: updatedUser.b2b_agent_id,

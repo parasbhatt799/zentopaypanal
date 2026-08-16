@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import type { UserProfile, UserRole } from '../types';
-import { Search, UserCheck, UserX, Shield, User, Filter, Check, Ban, UserPlus, Copy, X, Key, Phone, Mail, Sparkles, CheckCircle2, Network, Lock, Edit, Trash2, Settings } from 'lucide-react';
+import { Search, UserCheck, UserX, Shield, User, Filter, Check, Ban, UserPlus, Copy, X, Key, Phone, Mail, Sparkles, CheckCircle2, Network, Lock, Edit, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
 
 const UserApiBalance: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [balance, setBalance] = useState<number | null>(null);
@@ -70,6 +70,25 @@ const UserApiBalance: React.FC<{ user: UserProfile }> = ({ user }) => {
   );
 };
 
+const PasswordCell: React.FC<{ password?: string }> = ({ password = 'password123' }) => {
+  const [show, setShow] = useState(false);
+
+  return (
+    <div className="flex items-center space-x-1.5 font-mono text-slate-300">
+      <span className="bg-slate-800 px-2 py-1 rounded text-[11px] border border-slate-700 min-w-[72px] inline-block text-center select-all">
+        {show ? password : '••••••••'}
+      </span>
+      <button 
+        onClick={() => setShow(!show)}
+        className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+        title={show ? "Hide Password" : "Show Password"}
+      >
+        {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  );
+};
+
 export const UserList: React.FC = () => {
   const { users, toggleUserStatus, createNewUser, deleteUser, updateUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,8 +96,14 @@ export const UserList: React.FC = () => {
 
   // Create User Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [middleName, setMiddleName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [altPhone, setAltPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [firmAddress, setFirmAddress] = useState('');
+  const [reference, setReference] = useState('');
   const [email, setEmail] = useState('');
   const [b2bAgentId, setB2BAgentId] = useState('');
   const [userRole, setUserRole] = useState<UserRole>('user');
@@ -86,8 +111,14 @@ export const UserList: React.FC = () => {
   // Edit User Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
-  const [editFullName, setEditFullName] = useState('');
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editMiddleName, setEditMiddleName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editAltPhone, setEditAltPhone] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editFirmAddress, setEditFirmAddress] = useState('');
+  const [editReference, setEditReference] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editB2BAgentId, setEditB2BAgentId] = useState('');
   const [editUserRole, setEditUserRole] = useState<UserRole>('user');
@@ -108,8 +139,14 @@ export const UserList: React.FC = () => {
 
   const handleOpenEdit = (user: UserProfile) => {
     setEditingUser(user);
-    setEditFullName(user.full_name);
+    setEditFirstName(user.first_name || '');
+    setEditMiddleName(user.middle_name || '');
+    setEditLastName(user.last_name || '');
     setEditPhone(user.phone || '');
+    setEditAltPhone(user.alt_phone || '');
+    setEditAddress(user.address || '');
+    setEditFirmAddress(user.firm_address || '');
+    setEditReference(user.reference || '');
     setEditEmail(user.email || '');
     setEditB2BAgentId(user.b2b_agent_id || '');
     setEditUserRole(user.role);
@@ -129,8 +166,14 @@ export const UserList: React.FC = () => {
     if (!apiSettingsUser) return;
 
     await updateUser(apiSettingsUser.id, {
-      full_name: apiSettingsUser.full_name,
+      first_name: apiSettingsUser.first_name,
+      middle_name: apiSettingsUser.middle_name,
+      last_name: apiSettingsUser.last_name,
       phone: apiSettingsUser.phone || '',
+      alt_phone: apiSettingsUser.alt_phone,
+      address: apiSettingsUser.address,
+      firm_address: apiSettingsUser.firm_address,
+      reference: apiSettingsUser.reference,
       email: apiSettingsUser.email,
       role: apiSettingsUser.role,
       x_api_key: apiSettingsXApiKey,
@@ -144,11 +187,17 @@ export const UserList: React.FC = () => {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingUser || !editFullName || !editPhone) return;
+    if (!editingUser || !editFirstName || !editLastName || !editPhone) return;
 
     await updateUser(editingUser.id, {
-      full_name: editFullName,
+      first_name: editFirstName,
+      middle_name: editMiddleName,
+      last_name: editLastName,
       phone: editPhone,
+      alt_phone: editAltPhone,
+      address: editAddress,
+      firm_address: editFirmAddress,
+      reference: editReference,
       email: editEmail,
       role: editUserRole,
       b2b_agent_id: editB2BAgentId,
@@ -177,11 +226,17 @@ export const UserList: React.FC = () => {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !phone) return;
+    if (!firstName || !lastName || !phone) return;
 
     const result = await createNewUser({
-      full_name: fullName,
+      first_name: firstName,
+      middle_name: middleName,
+      last_name: lastName,
       phone: phone,
+      alt_phone: altPhone,
+      address: address,
+      firm_address: firmAddress,
+      reference: reference,
       email: email,
       role: userRole,
       wallet_balance: 0,
@@ -189,8 +244,14 @@ export const UserList: React.FC = () => {
     });
 
     // Reset Form & Show Credentials Modal
-    setFullName('');
+    setFirstName('');
+    setMiddleName('');
+    setLastName('');
     setPhone('');
+    setAltPhone('');
+    setAddress('');
+    setFirmAddress('');
+    setReference('');
     setEmail('');
     setB2BAgentId('');
     setIsAddModalOpen(false);
@@ -325,10 +386,8 @@ export const UserList: React.FC = () => {
                     {u.phone || '9876543210'}
                   </td>
 
-                  <td className="py-3.5 px-4 font-mono text-slate-300">
-                    <span className="bg-slate-800 px-2 py-1 rounded text-[11px] border border-slate-700">
-                      {u.password || 'password123'}
-                    </span>
+                  <td className="py-3.5 px-4">
+                    <PasswordCell password={u.password} />
                   </td>
 
                   <td className="py-3.5 px-4">
@@ -414,7 +473,7 @@ export const UserList: React.FC = () => {
       {/* MODAL 1: Create New User Form */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="max-w-md w-full glass-panel p-6 border border-slate-700 shadow-2xl relative">
+          <div className="max-w-md w-full glass-panel p-6 border border-slate-700 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
               <div className="flex items-center space-x-2">
                 <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
@@ -431,35 +490,121 @@ export const UserList: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Ramesh Patel"
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
-                />
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="First Name"
+                    required
+                    className="w-full px-2.5 py-2.5 rounded-xl glass-input text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Middle Name
+                  </label>
+                  <input
+                    type="text"
+                    value={middleName}
+                    onChange={(e) => setMiddleName(e.target.value)}
+                    placeholder="Middle Name"
+                    className="w-full px-2.5 py-2.5 rounded-xl glass-input text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Last Name"
+                    required
+                    className="w-full px-2.5 py-2.5 rounded-xl glass-input text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Mobile (User ID)
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="9898989898"
+                      required
+                      className="w-full pl-9 pr-2.5 py-2.5 rounded-xl glass-input text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Alt Mobile (Opt)
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3.5 top-3 h-4 w-4 text-slate-550" />
+                    <input
+                      type="tel"
+                      value={altPhone}
+                      onChange={(e) => setAltPhone(e.target.value)}
+                      placeholder="Alt Phone"
+                      className="w-full pl-9 pr-2.5 py-2.5 rounded-xl glass-input text-xs font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Address
+                  </label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Resident Address"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Firm Address
+                  </label>
+                  <input
+                    type="text"
+                    value={firmAddress}
+                    onChange={(e) => setFirmAddress(e.target.value)}
+                    placeholder="Business Address"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
-                  Mobile Number (Will be used as User ID)
+                  Reference / Broker Name
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="10-Digit Mobile Number (e.g. 9898989898)"
-                    required
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-mono"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder="e.g. Self or broker name"
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
+                />
               </div>
 
               <div>
@@ -634,7 +779,7 @@ export const UserList: React.FC = () => {
       {/* MODAL 3: Edit Existing User */}
       {isEditModalOpen && editingUser && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="max-w-md w-full glass-panel p-6 border border-slate-700 shadow-2xl relative">
+          <div className="max-w-md w-full glass-panel p-6 border border-slate-700 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
               <div className="flex items-center space-x-2">
                 <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
@@ -642,7 +787,7 @@ export const UserList: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-extrabold text-white">Edit User Account</h3>
-                  <p className="text-[10px] text-slate-400">Modify user profile, wallet balance, and credentials</p>
+                  <p className="text-[10px] text-slate-400">Modify user profile, B2B Agent ID, and credentials</p>
                 </div>
               </div>
               <button
@@ -657,38 +802,121 @@ export const UserList: React.FC = () => {
             </div>
 
             <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    First Name
+                  </label>
                   <input
                     type="text"
-                    value={editFullName}
-                    onChange={(e) => setEditFullName(e.target.value)}
-                    placeholder="e.g. Ramesh Patel"
+                    value={editFirstName}
+                    onChange={(e) => setEditFirstName(e.target.value)}
+                    placeholder="First Name"
                     required
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-medium"
+                    className="w-full px-2.5 py-2.5 rounded-xl glass-input text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Middle Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editMiddleName}
+                    onChange={(e) => setEditMiddleName(e.target.value)}
+                    placeholder="Middle Name"
+                    className="w-full px-2.5 py-2.5 rounded-xl glass-input text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editLastName}
+                    onChange={(e) => setEditLastName(e.target.value)}
+                    placeholder="Last Name"
+                    required
+                    className="w-full px-2.5 py-2.5 rounded-xl glass-input text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Mobile (User ID)
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                    <input
+                      type="tel"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="Mobile number"
+                      required
+                      className="w-full pl-9 pr-2.5 py-2.5 rounded-xl glass-input text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Alt Mobile (Opt)
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3.5 top-3 h-4 w-4 text-slate-550" />
+                    <input
+                      type="tel"
+                      value={editAltPhone}
+                      onChange={(e) => setEditAltPhone(e.target.value)}
+                      placeholder="Alt Phone"
+                      className="w-full pl-9 pr-2.5 py-2.5 rounded-xl glass-input text-xs font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Address
+                  </label>
+                  <input
+                    type="text"
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    placeholder="Resident Address"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+                    Firm Address
+                  </label>
+                  <input
+                    type="text"
+                    value={editFirmAddress}
+                    onChange={(e) => setEditFirmAddress(e.target.value)}
+                    placeholder="Business Address"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
-                  Mobile Number (User ID)
+                  Reference / Broker Name
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-                  <input
-                    type="tel"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    placeholder="10-Digit Mobile Number"
-                    required
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-mono"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={editReference}
+                  onChange={(e) => setEditReference(e.target.value)}
+                  placeholder="e.g. broker or agent reference"
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
+                />
               </div>
 
               <div>

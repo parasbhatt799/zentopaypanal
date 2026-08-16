@@ -7,7 +7,14 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
   phone?: string;
+  alt_phone?: string;
+  address?: string;
+  firm_address?: string;
+  reference?: string;
   password?: string;
   password_change_required?: boolean;
   mpin?: string;
