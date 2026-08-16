@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import type { UserProfile, UserRole } from '../types';
-import { Search, UserCheck, UserX, Shield, User, Filter, Check, Ban, UserPlus, Copy, X, Key, Phone, Mail, Sparkles, CheckCircle2, Network, Lock, Edit, Trash2 } from 'lucide-react';
+import { Search, UserCheck, UserX, Shield, User, Filter, Check, Ban, UserPlus, Copy, X, Key, Phone, Mail, Sparkles, CheckCircle2, Network, Lock, Edit, Trash2, Settings } from 'lucide-react';
 
 const UserApiBalance: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [balance, setBalance] = useState<number | null>(null);
@@ -80,9 +80,6 @@ export const UserList: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [xApiKey, setXApiKey] = useState('');
-  const [xSecretKey, setXSecretKey] = useState('');
-  const [walletBalance, setWalletBalance] = useState('0');
   const [b2bAgentId, setB2BAgentId] = useState('');
   const [userRole, setUserRole] = useState<UserRole>('user');
 
@@ -92,11 +89,15 @@ export const UserList: React.FC = () => {
   const [editFullName, setEditFullName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
-  const [editXApiKey, setEditXApiKey] = useState('');
-  const [editXSecretKey, setEditXSecretKey] = useState('');
   const [editB2BAgentId, setEditB2BAgentId] = useState('');
   const [editUserRole, setEditUserRole] = useState<UserRole>('user');
   const [editPassword, setEditPassword] = useState('');
+
+  // B2B API Settings Modal State
+  const [isApiSettingsModalOpen, setIsApiSettingsModalOpen] = useState(false);
+  const [apiSettingsUser, setApiSettingsUser] = useState<UserProfile | null>(null);
+  const [apiSettingsXApiKey, setApiSettingsXApiKey] = useState('');
+  const [apiSettingsXSecretKey, setApiSettingsXSecretKey] = useState('');
 
   // Created Credentials Popup Modal State
   const [createdCredentials, setCreatedCredentials] = useState<{
@@ -110,12 +111,35 @@ export const UserList: React.FC = () => {
     setEditFullName(user.full_name);
     setEditPhone(user.phone || '');
     setEditEmail(user.email || '');
-    setEditXApiKey(user.x_api_key || '');
-    setEditXSecretKey(user.x_secret_key || '');
     setEditB2BAgentId(user.b2b_agent_id || '');
     setEditUserRole(user.role);
     setEditPassword(user.password || 'password123');
     setIsEditModalOpen(true);
+  };
+
+  const handleOpenApiSettings = (user: UserProfile) => {
+    setApiSettingsUser(user);
+    setApiSettingsXApiKey(user.x_api_key || '');
+    setApiSettingsXSecretKey(user.x_secret_key || '');
+    setIsApiSettingsModalOpen(true);
+  };
+
+  const handleApiSettingsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!apiSettingsUser) return;
+
+    await updateUser(apiSettingsUser.id, {
+      full_name: apiSettingsUser.full_name,
+      phone: apiSettingsUser.phone || '',
+      email: apiSettingsUser.email,
+      role: apiSettingsUser.role,
+      x_api_key: apiSettingsXApiKey,
+      x_secret_key: apiSettingsXSecretKey,
+      password: apiSettingsUser.password,
+    });
+
+    setIsApiSettingsModalOpen(false);
+    setApiSettingsUser(null);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -128,8 +152,6 @@ export const UserList: React.FC = () => {
       email: editEmail,
       role: editUserRole,
       b2b_agent_id: editB2BAgentId,
-      x_api_key: editXApiKey,
-      x_secret_key: editXSecretKey,
       password: editPassword,
     });
 
@@ -161,8 +183,6 @@ export const UserList: React.FC = () => {
       full_name: fullName,
       phone: phone,
       email: email,
-      x_api_key: xApiKey,
-      x_secret_key: xSecretKey,
       role: userRole,
       wallet_balance: 0,
       b2b_agent_id: b2bAgentId,
@@ -172,8 +192,6 @@ export const UserList: React.FC = () => {
     setFullName('');
     setPhone('');
     setEmail('');
-    setXApiKey('');
-    setXSecretKey('');
     setB2BAgentId('');
     setIsAddModalOpen(false);
 
@@ -362,6 +380,14 @@ export const UserList: React.FC = () => {
                       </button>
 
                       <button
+                        onClick={() => handleOpenApiSettings(u)}
+                        title="B2B API Settings"
+                        className="p-2 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 transition-all flex items-center justify-center"
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                      </button>
+
+                      <button
                         onClick={() => handleOpenEdit(u)}
                         title="Edit User"
                         className="p-2 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all flex items-center justify-center"
@@ -433,40 +459,6 @@ export const UserList: React.FC = () => {
                     required
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-mono"
                   />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
-                    x-api-key
-                  </label>
-                  <div className="relative">
-                    <Key className="absolute left-3.5 top-3.5 h-4 w-4 text-indigo-400" />
-                    <input
-                      type="text"
-                      value={xApiKey}
-                      onChange={(e) => setXApiKey(e.target.value)}
-                      placeholder="Enter B2B API Key"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
-                    x-secret-key
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-indigo-400" />
-                    <input
-                      type="text"
-                      value={xSecretKey}
-                      onChange={(e) => setXSecretKey(e.target.value)}
-                      placeholder="Enter B2B Secret Key"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-mono"
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -699,40 +691,6 @@ export const UserList: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
-                    x-api-key
-                  </label>
-                  <div className="relative">
-                    <Key className="absolute left-3.5 top-3.5 h-4 w-4 text-indigo-400" />
-                    <input
-                      type="text"
-                      value={editXApiKey}
-                      onChange={(e) => setEditXApiKey(e.target.value)}
-                      placeholder="API Key"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
-                    x-secret-key
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-indigo-400" />
-                    <input
-                      type="text"
-                      value={editXSecretKey}
-                      onChange={(e) => setEditXSecretKey(e.target.value)}
-                      placeholder="Secret Key"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
                   Email Address
@@ -802,6 +760,74 @@ export const UserList: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-purple-700 hover:from-indigo-500 hover:to-purple-600 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all"
               >
                 Save Changes &amp; Update
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: B2B API Settings */}
+      {isApiSettingsModalOpen && apiSettingsUser && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl relative">
+            <button
+              onClick={() => {
+                setIsApiSettingsModalOpen(false);
+                setApiSettingsUser(null);
+              }}
+              className="absolute right-4 top-4 p-2 text-slate-400 hover:text-white transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="h-10 w-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                <Settings className="h-5 w-5 animate-spin-slow" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">B2B API Settings</h2>
+                <p className="text-[11px] text-slate-400">Configure keys for {apiSettingsUser.full_name}</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleApiSettingsSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
+                  x-api-key
+                </label>
+                <div className="relative">
+                  <Key className="absolute left-3.5 top-3.5 h-4 w-4 text-cyan-400" />
+                  <input
+                    type="text"
+                    value={apiSettingsXApiKey}
+                    onChange={(e) => setApiSettingsXApiKey(e.target.value)}
+                    placeholder="Enter B2B API Key"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-mono text-cyan-200"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
+                  x-secret-key
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-cyan-400" />
+                  <input
+                    type="text"
+                    value={apiSettingsXSecretKey}
+                    onChange={(e) => setApiSettingsXSecretKey(e.target.value)}
+                    placeholder="Enter B2B Secret Key"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-mono text-cyan-200"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 mt-2 rounded-xl bg-gradient-to-r from-cyan-600 via-cyan-500 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/30 transition-all"
+              >
+                Save API Keys
               </button>
             </form>
           </div>
