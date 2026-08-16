@@ -34,7 +34,7 @@ export const UserFundRequest: React.FC = () => {
 
     const fetchBalance = async () => {
       try {
-        const response = await fetch('https://www.usepay.in/api/v1/b2b/balance', {
+        const response = await fetch('/api/v1/b2b/balance', {
           headers: {
             'x-api-key': currentUser.x_api_key || '',
             'x-secret-key': currentUser.x_secret_key || ''
@@ -158,7 +158,7 @@ export const UserFundRequest: React.FC = () => {
       if (!currentUser?.x_api_key || !currentUser?.x_secret_key) return;
       setIsFetchingBanks(true);
       try {
-        const response = await fetch('https://www.usepay.in/api/v1/b2b/admin-bank-accounts', {
+        const response = await fetch('/api/v1/b2b/admin-bank-accounts', {
           method: 'GET',
           headers: {
             'x-api-key': currentUser.x_api_key.trim(),
@@ -185,7 +185,7 @@ export const UserFundRequest: React.FC = () => {
     try {
       await refreshData();
       if (currentUser?.x_api_key && currentUser?.x_secret_key) {
-        const response = await fetch('https://www.usepay.in/api/v1/b2b/balance', {
+        const response = await fetch('/api/v1/b2b/balance', {
           headers: {
             'x-api-key': currentUser.x_api_key || '',
             'x-secret-key': currentUser.x_secret_key || ''

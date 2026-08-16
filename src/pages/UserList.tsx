@@ -19,7 +19,7 @@ const UserApiBalance: React.FC<{ user: UserProfile }> = ({ user }) => {
     const fetchBalance = async () => {
       setLoading(true);
       try {
-        const response = await fetch('https://www.usepay.in/api/v1/b2b/balance', {
+        const response = await fetch('/api/v1/b2b/balance', {
           headers: {
             'x-api-key': user.x_api_key || '',
             'x-secret-key': user.x_secret_key || ''

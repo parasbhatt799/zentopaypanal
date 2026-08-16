@@ -974,7 +974,7 @@ export const CreditCardBillPay: React.FC = () => {
     }));
 
     try {
-      const response = await fetch('https://www.usepay.in/api/v1/b2b/fetch-bill', {
+      const response = await fetch('/api/v1/b2b/fetch-bill', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

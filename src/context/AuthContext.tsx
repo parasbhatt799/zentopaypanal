@@ -737,7 +737,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log(">>> [UsePay API Request] PAYLOAD SENT:", requestPayload);
 
     try {
-      const response = await fetch('https://www.usepay.in/api/v1/b2b/pay-bill', {
+      const response = await fetch('/api/v1/b2b/pay-bill', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -886,7 +886,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const response = await fetch('https://www.usepay.in/api/v1/b2b/fund-request', {
+      const response = await fetch('/api/v1/b2b/fund-request', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -948,7 +948,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     for (const req of pending) {
       try {
-        const response = await fetch(`https://www.usepay.in/api/v1/b2b/fund-request/status/${req.id}`, {
+        const response = await fetch(`/api/v1/b2b/fund-request/status/${req.id}`, {
           method: 'GET',
           headers: {
             'x-api-key': apiKey,
@@ -1019,7 +1019,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         const txnId = bill.transaction_ref.split(' ')[0];
-        const url = `https://www.usepay.in/api/v1/b2b/status/${txnId}`;
+        const url = `/api/v1/b2b/status/${txnId}`;
 
         console.log(`>>> [Pending Status Cron] Checking status for ${txnId}...`);
 
