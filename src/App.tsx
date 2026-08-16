@@ -26,11 +26,30 @@ const AppContent: React.FC = () => {
   const [currentTab, setCurrentTab] = React.useState<string>(() => {
     return localStorage.getItem('zentopay_current_tab') || 'admin-dashboard';
   });
-  const [sidebarCollapsed, setSidebarCollapsed] = React.useState<boolean>(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState<boolean>(() => {
+    return window.innerWidth < 1024;
+  });
+
+  const [forceDesktopMode, setForceDesktopMode] = React.useState<boolean>(() => {
+    const saved = localStorage.getItem('zentopay_force_desktop');
+    return saved === null ? true : saved === 'true';
+  });
 
   React.useEffect(() => {
     localStorage.setItem('zentopay_current_tab', currentTab);
   }, [currentTab]);
+
+  React.useEffect(() => {
+    localStorage.setItem('zentopay_force_desktop', String(forceDesktopMode));
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+      if (forceDesktopMode) {
+        viewport.setAttribute('content', 'width=1280, initial-scale=0.3, maximum-scale=3.0, user-scalable=yes');
+      } else {
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+    }
+  }, [forceDesktopMode]);
 
   // 1. Unauthenticated -> Show Login Page
   if (!currentUser || !role) {
@@ -55,12 +74,24 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-slate-950 flex flex-col lg:flex-row text-slate-100 font-sans relative overflow-hidden">
+    <div className={`h-screen bg-slate-950 flex text-slate-100 font-sans relative overflow-hidden ${
+      forceDesktopMode ? 'flex-row' : 'flex-col lg:flex-row'
+    }`}>
       {/* Constellation Starry Particle Background */}
       <StarryBackground />
 
       {/* Sidebar - starts from the very top/edge of screen */}
-      <Sidebar currentTab={currentTab} onTabChange={setCurrentTab} collapsed={sidebarCollapsed} />
+      <Sidebar 
+        currentTab={currentTab} 
+        onTabChange={(tab) => {
+          setCurrentTab(tab);
+          if (window.innerWidth < 1024 && !forceDesktopMode) {
+            setSidebarCollapsed(true);
+          }
+        }} 
+        collapsed={sidebarCollapsed} 
+        forceDesktop={forceDesktopMode}
+      />
 
       {/* Right Workspace */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden relative z-10">
@@ -68,6 +99,8 @@ const AppContent: React.FC = () => {
           activeTab={currentTab} 
           sidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+          forceDesktopMode={forceDesktopMode}
+          onToggleDesktopMode={() => setForceDesktopMode(!forceDesktopMode)}
         />
 
         <main className="flex-1 px-4 sm:px-16 lg:px-24 py-8 overflow-y-auto">

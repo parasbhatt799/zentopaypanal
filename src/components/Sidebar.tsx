@@ -8,6 +8,7 @@ interface SidebarProps {
   currentTab: string;
   onTabChange: (tab: string) => void;
   collapsed?: boolean;
+  forceDesktop?: boolean;
 }
 
 const BBPSIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
@@ -23,7 +24,7 @@ const BBPSIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, collapsed = false }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, collapsed = false, forceDesktop = false }) => {
   const { role, maintenance, updateMaintenance } = useAuth();
 
   const adminMenuItems = [
@@ -50,8 +51,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, colla
   const menuItems = role === 'admin' ? adminMenuItems : userMenuItems;
 
   return (
-    <aside className={`sidebar-aside w-full shrink-0 flex flex-col justify-between bg-slate-900/60 backdrop-blur-lg border-b lg:border-b-0 lg:border-r border-slate-800/80 pb-4 transition-all duration-300 ${
-      collapsed ? 'lg:w-20' : 'lg:w-64'
+    <aside className={`sidebar-aside shrink-0 flex flex-col justify-between bg-slate-900/60 backdrop-blur-lg border-b lg:border-b-0 lg:border-r border-slate-800/80 pb-4 transition-all duration-300 ${
+      forceDesktop
+        ? (collapsed ? 'flex w-20' : 'flex w-64')
+        : (collapsed ? 'hidden lg:flex lg:w-20' : 'flex w-full lg:w-64')
     }`}>
       {/* Brand Logo & Panel Identity */}
       <div className={`flex items-center border-b border-slate-800/40 shrink-0 transition-all duration-300 ${
@@ -86,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, colla
               >
                 <div className={`flex items-center ${collapsed ? 'space-x-0 justify-center' : 'space-x-3'}`}>
                   <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
-                  <span className={`transition-all duration-200 ${collapsed ? 'lg:hidden' : 'block'}`}>
+                  <span className={`transition-all duration-200 ${collapsed ? (forceDesktop ? 'hidden' : 'lg:hidden') : 'block'}`}>
                     {item.label}
                   </span>
                 </div>

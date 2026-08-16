@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Shield, User, LogOut, AlertTriangle, Zap, Sun, Moon, Menu } from 'lucide-react';
+import { Shield, User, LogOut, AlertTriangle, Zap, Sun, Moon, Menu, Monitor, Smartphone } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: string;
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
+  forceDesktopMode: boolean;
+  onToggleDesktopMode: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeTab, sidebarCollapsed = false, onToggleSidebar }) => {
+export const Navbar: React.FC<NavbarProps> = ({ 
+  activeTab, 
+  sidebarCollapsed = false, 
+  onToggleSidebar,
+  forceDesktopMode,
+  onToggleDesktopMode
+}) => {
   const { currentUser, role, logout, maintenance, theme, toggleTheme } = useAuth();
   const [apiBalance, setApiBalance] = useState<number | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -77,6 +85,19 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, sidebarCollapsed = fa
             className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/60 hover:border-indigo-500/30 transition-all duration-200 flex items-center justify-center"
           >
             {theme === 'light' ? <Moon className="h-4.5 w-4.5 text-indigo-400" /> : <Sun className="h-4.5 w-4.5 text-amber-400" />}
+          </button>
+ 
+          {/* Desktop/Mobile Layout Toggle Button */}
+          <button
+            onClick={onToggleDesktopMode}
+            title={forceDesktopMode ? 'Switch to Mobile View' : 'Switch to Desktop View'}
+            className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/60 hover:border-indigo-500/30 transition-all duration-200 flex items-center justify-center cursor-pointer"
+          >
+            {forceDesktopMode ? (
+              <Smartphone className="h-4.5 w-4.5 text-indigo-400" />
+            ) : (
+              <Monitor className="h-4.5 w-4.5 text-emerald-400" />
+            )}
           </button>
 
           {/* Live API Balance Badge */}
