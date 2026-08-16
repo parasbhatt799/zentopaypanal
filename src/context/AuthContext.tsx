@@ -93,9 +93,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (match) {
         try {
           const storedPasswords = JSON.parse(localStorage.getItem('zentopay_user_passwords') || '{}');
-          match.password = match.password || storedPasswords[match.id] || 'password123';
+          match.password = match.password || storedPasswords[match.id];
         } catch (e) {
-          match.password = match.password || 'password123';
+          console.error(e);
         }
         try {
           const storedMpins = JSON.parse(localStorage.getItem('zentopay_user_mpins') || '{}');
@@ -189,12 +189,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const storedMpins = JSON.parse(localStorage.getItem('zentopay_user_mpins') || '{}');
           const profilesWithPasswords = profilesData.map((p) => ({
             ...p,
-            password: p.password || storedPasswords[p.id] || 'password123',
+            password: p.password || storedPasswords[p.id],
             mpin: p.mpin || storedMpins[p.id] || undefined
           }));
           setUsers(profilesWithPasswords);
         } catch (e) {
-          setUsers(profilesData.map(p => ({ ...p, password: p.password || 'password123' })));
+          setUsers(profilesData.map(p => ({ ...p, password: p.password || '' })));
         }
       }
 
@@ -275,7 +275,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Validate password if user exists
       try {
         const storedPasswords = JSON.parse(localStorage.getItem('zentopay_user_passwords') || '{}');
-        const activePassword = target.password || storedPasswords[target.id] || 'password123';
+        const activePassword = target.password || storedPasswords[target.id] || '';
         if (passwordText && passwordText !== activePassword) {
           throw new Error('Incorrect password. Please try again.');
         }
@@ -297,50 +297,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (!target) {
-      const isPhone = /^\d+$/.test(cleanId.replace(/\D/g, ''));
-      const generatedB2BAgentId = `B2B-AGT-${cleanId.replace(/\D/g, '') || Math.floor(10000 + Math.random() * 90000)}`;
-      const resolvedRole = role || 'user';
-      target = {
-        id: `u-${Date.now()}`,
-        email: isPhone ? `${cleanId}@zentopay.com` : cleanId,
-        full_name: resolvedRole === 'admin' ? 'Administrator' : 'Card Member User',
-        phone: isPhone ? cleanId : '9876543210',
-        password: passwordText || 'password123',
-        password_change_required: resolvedRole === 'user',
-        b2b_agent_id: generatedB2BAgentId,
-        b2b_sync_status: 'synced',
-        role: resolvedRole,
-        status: 'active',
-        wallet_balance: resolvedRole === 'admin' ? 500000 : 35000,
-        created_at: new Date().toISOString(),
-      };
-      setUsers((prev) => [...prev, target!]);
-
-      if (isSupabaseConfigured && supabase) {
-        supabase.from('profiles').insert({
-          email: target.email,
-          full_name: target.full_name,
-          phone: target.phone,
-          password: target.password,
-          password_change_required: target.password_change_required,
-          b2b_agent_id: target.b2b_agent_id,
-          b2b_sync_status: target.b2b_sync_status,
-          role: target.role,
-          status: target.status,
-          wallet_balance: target.wallet_balance,
-        }).select().then(({ data, error }) => {
-          if (error) {
-            console.error('Supabase auto-create user error:', error);
-          } else if (data && data[0]) {
-            const dbUser = data[0];
-            setUsers((prev) => prev.map((u) => u.email === dbUser.email ? { ...u, id: dbUser.id } : u));
-            if (localStorage.getItem('zentopay_active_user_id') === target?.id) {
-              localStorage.setItem('zentopay_active_user_id', dbUser.id);
-            }
-            setCurrentUser((prev) => prev && prev.email === dbUser.email ? { ...prev, id: dbUser.id } : prev);
-          }
-        });
-      }
+      throw new Error('Account not found. Please verify User ID.');
     }
 
     if (target) {

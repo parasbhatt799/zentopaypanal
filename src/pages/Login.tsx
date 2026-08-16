@@ -45,7 +45,7 @@ export const Login: React.FC = () => {
 
     // Verify Password
     const storedPasswords = JSON.parse(localStorage.getItem('zentopay_user_passwords') || '{}');
-    const activePassword = target.password || storedPasswords[target.id] || 'password123';
+    const activePassword = target.password || storedPasswords[target.id] || '';
     
     if (password !== activePassword) {
       setErrorMessage('Incorrect password. Please try again.');

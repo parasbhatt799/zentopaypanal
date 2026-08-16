@@ -47,7 +47,7 @@ export const ChangePassword: React.FC = () => {
     if (!currentUser) return;
 
     // Validate current password
-    const activePassword = currentUser.password || 'password123';
+    const activePassword = currentUser.password || '';
     if (currentPassword !== activePassword) {
       setError('Current password is incorrect.');
       return;
