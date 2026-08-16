@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import logoImg from '../assets/logo.png';
 import { Zap, Lock, Phone, ArrowRight, AlertCircle, Eye, EyeOff, ArrowLeft, Sun, Moon } from 'lucide-react';
@@ -21,6 +21,21 @@ export const Login: React.FC = () => {
   const [createDigits, setCreateDigits] = useState<string[]>(Array(6).fill(''));
   const [confirmDigits, setConfirmDigits] = useState<string[]>(Array(6).fill(''));
   const [verifyDigits, setVerifyDigits] = useState<string[]>(Array(6).fill(''));
+
+  // Auto-focus first MPIN input box when entering verification or creation screens
+  useEffect(() => {
+    if (step === 'mpin-verify') {
+      setTimeout(() => {
+        const firstInput = document.getElementById('mpin-verify-0');
+        if (firstInput) firstInput.focus();
+      }, 50);
+    } else if (step === 'mpin-create') {
+      setTimeout(() => {
+        const firstInput = document.getElementById('mpin-create-0');
+        if (firstInput) firstInput.focus();
+      }, 50);
+    }
+  }, [step]);
 
   // Step 1: Handle UserID and Password Submission
   const handleCredentialsSubmit = (e: React.FormEvent) => {
