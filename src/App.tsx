@@ -10,6 +10,7 @@ import { CreditCardBillPay } from './pages/CreditCardBillPay';
 import { MaintenancePage } from './pages/MaintenancePage';
 import { ForceChangePassword } from './pages/ForceChangePassword';
 import { CategorySettings } from './pages/CategorySettings';
+import { BillerSettings } from './pages/BillerSettings';
 import { BannerSettings } from './pages/BannerSettings';
 import { ChangePassword } from './pages/ChangePassword';
 import { AdminPaymentHistory } from './pages/AdminPaymentHistory';
@@ -67,7 +68,7 @@ const AppContent: React.FC = () => {
   }
 
   // Set default tab on role switch if invalid
-  if (role === 'admin' && !['admin-dashboard', 'user-list', 'admin-payment-history', 'admin-fund-history', 'category-settings', 'banner-settings', 'system-statement', 'admin-settings', 'change-password'].includes(currentTab)) {
+  if (role === 'admin' && !['admin-dashboard', 'user-list', 'admin-payment-history', 'admin-fund-history', 'category-settings', 'biller-settings', 'banner-settings', 'system-statement', 'admin-settings', 'change-password'].includes(currentTab)) {
     setCurrentTab('admin-dashboard');
   } else if (role === 'user' && !['user-dashboard', 'credit-card-bill', 'change-password', 'fund-request', 'bill-history', 'account-statement'].includes(currentTab)) {
     setCurrentTab('user-dashboard');
@@ -112,6 +113,7 @@ const AppContent: React.FC = () => {
                 {currentTab === 'admin-payment-history' && <AdminPaymentHistory />}
                 {currentTab === 'admin-fund-history' && <AdminFundHistory />}
                 {currentTab === 'category-settings' && <CategorySettings />}
+                {currentTab === 'biller-settings' && <BillerSettings />}
                 {currentTab === 'banner-settings' && <BannerSettings />}
                 {currentTab === 'system-statement' && <AdminStatement />}
                 {currentTab === 'admin-settings' && <AdminSettings />}

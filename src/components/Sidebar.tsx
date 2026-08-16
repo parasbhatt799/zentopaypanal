@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import logoImg from '../assets/logo.png';
 import logoIconImg from '../assets/logo_icon.png';
-import { LayoutDashboard, Users, CreditCard, Wrench, ChevronRight, AlertOctagon, Sliders, Image, Lock, Banknote, Zap, History, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, CreditCard, Wrench, ChevronRight, AlertOctagon, Sliders, Image, Lock, Banknote, Zap, History, FileText, ToggleLeft } from 'lucide-react';
 
 interface SidebarProps {
   currentTab: string;
@@ -33,6 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, colla
     { id: 'admin-payment-history', label: 'Payment History', icon: CreditCard },
     { id: 'admin-fund-history', label: 'Fund History', icon: Banknote },
     { id: 'category-settings', label: 'Bill Categories', icon: Sliders },
+    { id: 'biller-settings', label: 'Biller Toggle', icon: ToggleLeft },
     { id: 'banner-settings', label: 'Ad Banners', icon: Image },
     { id: 'system-statement', label: 'System Statement', icon: FileText },
     { id: 'admin-settings', label: 'System Settings', icon: Wrench },

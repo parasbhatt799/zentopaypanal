@@ -163,6 +163,37 @@ export const CreditCardBillPay: React.FC = () => {
   const [activeStep, setActiveStep] = useState<1 | 2>(1);
   const [billers, setBillers] = useState<any[]>(PRESET_CC_BILLERS);
   const [selectedBiller, setSelectedBiller] = useState<any>(PRESET_CC_BILLERS[0]);
+  const [activeBillerSettings, setActiveBillerSettings] = useState<Record<string, boolean>>({});
+
+  // Load Biller settings config from Supabase
+  useEffect(() => {
+    const loadBillerSettings = async () => {
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('system_settings')
+            .select('value')
+            .eq('key', 'credit_card_biller_settings')
+            .single();
+
+          if (!error && data && data.value) {
+            setActiveBillerSettings(data.value as Record<string, boolean>);
+          }
+        } catch (err) {
+          console.warn('Failed to load credit card biller settings:', err);
+        }
+      } else {
+        try {
+          const stored = localStorage.getItem('zentopay_cc_biller_settings');
+          if (stored) {
+            setActiveBillerSettings(JSON.parse(stored));
+          }
+        } catch {}
+      }
+    };
+
+    loadBillerSettings();
+  }, [isSupabaseConfigured, supabase]);
 
   // Dynamic fields state
   const [paramValues, setParamValues] = useState<Record<string, string>>({
@@ -819,7 +850,11 @@ export const CreditCardBillPay: React.FC = () => {
 
           if (!error && data && data.length > 0) {
             const filteredData = selectedCategory === 'Credit Card'
-              ? data.filter(b => b.biller_name.toLowerCase().includes('card'))
+              ? data.filter(b => {
+                  const matchesCard = b.biller_name.toLowerCase().includes('card');
+                  const isActive = typeof activeBillerSettings[b.biller_id] !== 'undefined' ? activeBillerSettings[b.biller_id] : true;
+                  return matchesCard && isActive;
+                })
               : data;
 
             if (filteredData.length > 0) {
@@ -847,20 +882,31 @@ export const CreditCardBillPay: React.FC = () => {
 
       // 2. Fallback to preset Credit Cards if category is Credit Card and DB is empty
       if (selectedCategory === 'Credit Card') {
-        setBillers(PRESET_CC_BILLERS);
-        setSelectedBiller(PRESET_CC_BILLERS[0]);
+        const activePresets = PRESET_CC_BILLERS.filter(b => {
+          const isActive = typeof activeBillerSettings[b.biller_id] !== 'undefined' ? activeBillerSettings[b.biller_id] : true;
+          return isActive;
+        });
 
-        const initVals: Record<string, string> = {
-          'Last 4 Digits of Card Number': '8821',
-          'Mobile Number': currentUser?.phone || '9876543210'
-        };
-        setParamValues(initVals);
-        setFetchedBill(null);
+        setBillers(activePresets);
+        if (activePresets.length > 0) {
+          setSelectedBiller(activePresets[0]);
+
+          const initVals: Record<string, string> = {
+            'Last 4 Digits of Card Number': '8821',
+            'Mobile Number': currentUser?.phone || '9876543210'
+          };
+          setParamValues(initVals);
+          setFetchedBill(null);
+        } else {
+          setSelectedBiller(null);
+          setParamValues({});
+          setFetchedBill(null);
+        }
       }
     };
 
     loadBillersForCategory();
-  }, [selectedCategory, currentUser, isSupabaseConfigured, supabase]);
+  }, [selectedCategory, currentUser, activeBillerSettings, isSupabaseConfigured, supabase]);
 
   // Load banners from Supabase system_settings
   useEffect(() => {
