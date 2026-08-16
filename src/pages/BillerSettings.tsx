@@ -21,19 +21,27 @@ const getBillerLogoUrl = (billerName: string): string | null => {
   if (name.includes('boi ') || name.includes('bank of india') || name.includes('india credit')) return '/logos/boi-Bl_oOHHB.png';
   if (name.includes('canara bank') || name.includes('canara credit')) return '/logos/canara-B_SbmPQP.png';
   if (name.includes('csb bank') || name.includes('csb credit')) return '/logos/csb-fV039-_h.png';
-  if (name.includes('federal bank') || name.includes('federal credit')) return '/logos/federal-D_3n-L-c.png';
-  if (name.includes('hdfc') || name.includes('hdfc credit')) return '/logos/hdfc-Bb15t70L.png';
-  if (name.includes('icici') || name.includes('icici credit')) return '/logos/icici-Bt1d_Kz7.png';
-  if (name.includes('idbi bank') || name.includes('idbi credit')) return '/logos/idbi-CYT29G1C.png';
-  if (name.includes('idfc') || name.includes('idfc credit')) return '/logos/idfc-B6B1v7Z3.png';
-  if (name.includes('indusind') || name.includes('indusind credit')) return '/logos/indusind-B36KmA_H.png';
-  if (name.includes('karnataka bank') || name.includes('karnataka credit')) return '/logos/karnataka-CYQ-190q.png';
-  if (name.includes('kotak') || name.includes('kotak credit')) return '/logos/kotak-BnU9v9_f.png';
-  if (name.includes('pnb ') || name.includes('punjab national') || name.includes('punjab credit')) return '/logos/pnb-Bu9v9_fa.png';
-  if (name.includes('rbl ') || name.includes('ratnakar') || name.includes('rbl credit')) return '/logos/rbl-C_Tv90qa.png';
-  if (name.includes('sbi') || name.includes('state bank of india') || name.includes('sbi credit')) return '/logos/sbi-C1v79_ab.png';
-  if (name.includes('south indian bank') || name.includes('south indian credit')) return '/logos/sib-CV190_aq.png';
-  if (name.includes('yes bank') || name.includes('yes credit')) return '/logos/yes-B6B1v7Za.png';
+  if (name.includes('cub ') || name.includes('city union')) return '/logos/cub-TxFJ1Tcf.png';
+  if (name.includes('dcb bank') || name.includes('dcb credit')) return '/logos/dcb-BnT3YcoN.png';
+  if (name.includes('dhanlaxmi')) return '/logos/dhanlaxmi-DNA2nyHB.png';
+  if (name.includes('esaf')) return '/logos/esaf-BkaOrpfd.png';
+  if (name.includes('federal')) return '/logos/federal-BnCPtS-j.png';
+  if (name.includes('icici')) return '/logos/icici-CKAaLXKZ.png';
+  if (name.includes('idbi')) return '/logos/idbi-D8cZhPna.png';
+  if (name.includes('idfc')) return '/logos/idfc-CjnEwPR2.png';
+  if (name.includes('indian bank') || name.includes('indian credit')) return '/logos/indian-D1O-TGLU.png';
+  if (name.includes('indusind')) return '/logos/indusind-rqfG5HZW.png';
+  if (name.includes('iob') || name.includes('indian overseas')) return '/logos/iob-FqU0i4qX.png';
+  if (name.includes('j&k') || name.includes('jammu')) return '/logos/jk-C7QAtwmv.png';
+  if (name.includes('onecard') || name.includes('one card')) return '/logos/onecard-CITcK--6.png';
+  if (name.includes('pnb') || name.includes('punjab national')) return '/logos/pnb-wpl37PgL.png';
+  if (name.includes('saraswat')) return '/logos/saraswat-Dg8KuoYA.png';
+  if (name.includes('sbi') || name.includes('state bank') || name.includes('sbi card')) return '/logos/sbi-CY222kpF.png';
+  if (name.includes('sbm')) return '/logos/sbm-CI_ofwN1.png';
+  if (name.includes('sib ') || name.includes('south indian')) return '/logos/sib-CpcsoE2c.png';
+  if (name.includes('suryoday')) return '/logos/suryoday-yRkb8y82.png';
+  if (name.includes('tmb ') || name.includes('tamilnad')) return '/logos/tmb-Bkt_cjAZ.png';
+  if (name.includes('union bank') || name.includes('union credit')) return '/logos/union-Cqvrgp0_.png';
   return null;
 };
 
@@ -222,7 +230,7 @@ export const BillerSettings: React.FC = () => {
       )}
 
       {/* Search and Filter */}
-      <div className="glass-panel p-4 border border-slate-800 flex items-center justify-between">
+      <div className="glass-panel p-4 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
           <input
@@ -232,6 +240,34 @@ export const BillerSettings: React.FC = () => {
             placeholder="Search Credit Card Biller..."
             className="w-full pl-10 pr-4 py-2 rounded-xl glass-input text-xs"
           />
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => {
+              const newToggles = { ...toggles };
+              billers.forEach(b => {
+                newToggles[b.biller_id] = true;
+              });
+              setToggles(newToggles);
+            }}
+            className="px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-all hover:bg-slate-750"
+          >
+            Enable All
+          </button>
+          
+          <button
+            onClick={() => {
+              const newToggles = { ...toggles };
+              billers.forEach(b => {
+                newToggles[b.biller_id] = false;
+              });
+              setToggles(newToggles);
+            }}
+            className="px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-all hover:bg-slate-750"
+          >
+            Disable All
+          </button>
         </div>
       </div>
 
