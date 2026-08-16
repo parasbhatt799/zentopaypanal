@@ -99,7 +99,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, [currentUser?.x_api_key, currentUser?.x_secret_key]);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/5 dark:bg-slate-950/20 backdrop-blur-xl border-b border-slate-800/40 px-4 lg:px-8 py-3 transition-all duration-300">
+    <header className="sticky top-0 z-50 bg-white/5 dark:bg-slate-950/20 backdrop-blur-xl border-b border-slate-800/40 px-4 lg:px-8 py-3 transition-all duration-300">
       <div className="flex items-center justify-between w-full">
         {/* Sidebar Toggle Hamburger */}
         <button
