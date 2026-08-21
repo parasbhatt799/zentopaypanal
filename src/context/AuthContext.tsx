@@ -90,6 +90,7 @@ interface AuthContextType {
     customerParams: Array<{ name: string; value: string }>;
     billerResponseInfo?: any;
     mobile?: string;
+    customerPan?: string;
   }) => Promise<CreditCardBill>;
   refreshData: () => Promise<void>;
   theme: 'light' | 'dark';
@@ -780,7 +781,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const payBill = async (
     billData: Omit<CreditCardBill, 'id' | 'created_at' | 'status' | 'transaction_ref'>,
-    extra?: { billerId: string; customerParams: Array<{ name: string; value: string }>; billerResponseInfo?: any; mobile?: string }
+    extra?: { billerId: string; customerParams: Array<{ name: string; value: string }>; billerResponseInfo?: any; mobile?: string; customerPan?: string }
   ) => {
     // 1. Get current user profile to fetch keys
     const userProfile = users.find((u) => u.id === billData.user_id);
@@ -823,6 +824,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       customerParams: customerParams,
       billerResponseInfo: finalBillerResponseInfo
     };
+
+    if (extra?.customerPan) {
+      requestPayload.customerPan = extra.customerPan;
+    }
 
     if (fetchRequestId) {
       requestPayload.fetchRequestId = fetchRequestId;

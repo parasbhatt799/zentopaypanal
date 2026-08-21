@@ -202,6 +202,7 @@ export const CreditCardBillPay: React.FC = () => {
   });
 
   const [amount, setAmount] = useState<string>('12500');
+  const [customerPan, setCustomerPan] = useState<string>('');
   const [cardholderName, setCardholderName] = useState(currentUser?.full_name || 'Rajkumar Sharma');
   const paymentMethod = 'UPI Instant Direct';
 
@@ -1001,6 +1002,7 @@ export const CreditCardBillPay: React.FC = () => {
       'Mobile Number': currentUser?.phone || '9876543210'
     });
     setFetchedBill(null);
+    setCustomerPan('');
   };
 
 
@@ -1066,6 +1068,7 @@ export const CreditCardBillPay: React.FC = () => {
     setFetchedBill(null);
     setActiveStep(1);
     setSelectedCategory('');
+    setCustomerPan('');
   };
 
   const handleTpinVerifyAndPay = async (e: React.FormEvent) => {
@@ -1125,7 +1128,8 @@ export const CreditCardBillPay: React.FC = () => {
           billerResponseInfo: fetchedBill?.rawFetchData,
           mobile: Object.keys(paramValues).find(k => k.toLowerCase().includes('mobile') || k.toLowerCase().includes('phone')) 
             ? paramValues[Object.keys(paramValues).find(k => k.toLowerCase().includes('mobile') || k.toLowerCase().includes('phone'))!] 
-            : (currentUser.phone || '9876543210')
+            : (currentUser.phone || '9876543210'),
+          customerPan: numAmount >= 50000 ? customerPan : undefined
         });
 
         setIsProcessing(false);
@@ -1145,6 +1149,18 @@ export const CreditCardBillPay: React.FC = () => {
     if (isNaN(numAmount) || numAmount <= 0) {
       setErrorMessage('Please enter a valid bill payment amount.');
       return;
+    }
+
+    if (numAmount >= 50000) {
+      if (!customerPan) {
+        setErrorMessage('PAN Card number is required for payments of ₹50,000 or above.');
+        return;
+      }
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (!panRegex.test(customerPan)) {
+        setErrorMessage('Invalid PAN Card format. Please enter a valid 10-digit PAN (e.g. ABCDE1234F).');
+        return;
+      }
     }
 
     if (!currentUser) return;
@@ -1336,6 +1352,7 @@ export const CreditCardBillPay: React.FC = () => {
                                   setFetchedBill(null);
                                   setBillerDropdownOpen(false);
                                   setBillerSearchQuery('');
+                                  setCustomerPan('');
                                 }}
                                 className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 flex items-center justify-between cursor-pointer ${
                                   isSelected
@@ -1495,6 +1512,27 @@ export const CreditCardBillPay: React.FC = () => {
                         You can pay the full outstanding amount or enter a custom amount (e.g. minimum due).
                       </p>
                     </div>
+
+                    {parseFloat(amount || '0') >= 50000 && (
+                      <div className="mt-3 border-t border-indigo-500/10 pt-3 animate-fadeIn">
+                        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex justify-between">
+                          <span>PAN Card Number (Required for ₹50,000+)</span>
+                          <span className="text-[9px] text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded">RBI Guidelines</span>
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={10}
+                          value={customerPan}
+                          onChange={(e) => setCustomerPan(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                          placeholder="Enter 10-digit PAN Card Number"
+                          required
+                          className="w-full px-4 py-3 rounded-xl glass-input text-xs font-mono font-bold text-white bg-slate-900/50 border border-slate-700/60 focus:border-indigo-500/50 focus:outline-none placeholder-slate-500"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          PAN card is mandatory for payments of ₹50,000 or above.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
