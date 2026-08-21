@@ -149,7 +149,8 @@ export const UserFundRequest: React.FC = () => {
   const filteredAccounts = bankAccounts.filter(acc =>
     acc.bank_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     acc.account_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    acc.account_name.toLowerCase().includes(searchQuery.toLowerCase())
+    acc.account_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (acc.ifsc_code && acc.ifsc_code.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Fetch admin bank accounts list
@@ -595,7 +596,9 @@ export const UserFundRequest: React.FC = () => {
                       {selectedAccount ? (
                         <>
                           <span className="font-semibold text-white text-[11px] truncate leading-tight">{selectedAccount.bank_name}</span>
-                          <span className="font-mono text-slate-300 text-[10px] mt-0.5 leading-tight">A/C: {selectedAccount.account_number}</span>
+                          <span className="font-mono text-slate-300 text-[10px] mt-0.5 leading-tight">
+                            A/C: {selectedAccount.account_number} {selectedAccount.ifsc_code ? `| IFSC: ${selectedAccount.ifsc_code}` : ''}
+                          </span>
                           <span className="text-slate-400 text-[9px] mt-0.5 truncate leading-tight">{selectedAccount.account_name}</span>
                         </>
                       ) : (
@@ -653,7 +656,9 @@ export const UserFundRequest: React.FC = () => {
                                   }`}
                                 >
                                   <span className="font-semibold text-white text-xs">{acc.bank_name}</span>
-                                  <span className="font-mono text-slate-300 text-[10px] mt-0.5">A/C: {acc.account_number}</span>
+                                  <span className="font-mono text-slate-300 text-[10px] mt-0.5">
+                                    A/C: {acc.account_number} {acc.ifsc_code ? `| IFSC: ${acc.ifsc_code}` : ''}
+                                  </span>
                                   <span className="text-slate-400 text-[9px] mt-0.5 truncate">{acc.account_name}</span>
                                 </div>
                               );
