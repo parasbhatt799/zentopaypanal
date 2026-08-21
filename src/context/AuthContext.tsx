@@ -309,6 +309,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           storedMpins[target.id] = mpinText;
           localStorage.setItem('zentopay_user_mpins', JSON.stringify(storedMpins));
           target.mpin = mpinText;
+
+          // Update users state list
+          const userId = target.id;
+          setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, mpin: mpinText } : u));
+
+          // Sync to Supabase database if configured
+          if (isSupabaseConfigured && supabase) {
+            supabase
+              .from('profiles')
+              .update({ mpin: mpinText })
+              .eq('id', userId)
+              .then(({ error }) => {
+                if (error) {
+                  console.error('Failed to sync MPIN to database:', error);
+                } else {
+                  console.log('Successfully synced MPIN to database.');
+                }
+              });
+          }
         } catch (e) {
           console.error(e);
         }
