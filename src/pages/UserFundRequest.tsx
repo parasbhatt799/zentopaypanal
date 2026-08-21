@@ -618,7 +618,7 @@ export const UserFundRequest: React.FC = () => {
                       
                       {/* Custom Dropdown Popup (renders over everything inside card) */}
                       <div
-                        style={{ zIndex: 50 }}
+                        style={{ zIndex: 50, backgroundColor: '#0f172a', backdropFilter: 'none' }}
                         className="absolute left-0 right-0 mt-0 rounded-b-xl border border-slate-800 border-t-0 glass-panel p-2.5 shadow-2xl max-h-64 overflow-y-auto flex flex-col gap-2 animate-in fade-in duration-150"
                       >
                         {/* Search Input */}
