@@ -201,20 +201,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshData = async () => {
     if (!isSupabaseConfigured || !supabase) return;
     setIsLoading(true);
+    let activeProfiles: UserProfile[] = [];
     try {
       const { data: profilesData } = await supabase.from('profiles').select('*');
       if (profilesData && profilesData.length > 0) {
         try {
           const storedPasswords = JSON.parse(localStorage.getItem('zentopay_user_passwords') || '{}');
           const storedMpins = JSON.parse(localStorage.getItem('zentopay_user_mpins') || '{}');
-          const profilesWithPasswords = profilesData.map((p) => ({
+          activeProfiles = profilesData.map((p) => ({
             ...p,
             password: p.password || storedPasswords[p.id],
             mpin: p.mpin || storedMpins[p.id] || undefined
           }));
-          setUsers(profilesWithPasswords);
+          setUsers(activeProfiles);
         } catch (e) {
-          setUsers(profilesData.map(p => ({ ...p, password: p.password || '' })));
+          activeProfiles = profilesData.map(p => ({ ...p, password: p.password || '' }));
+          setUsers(activeProfiles);
         }
       }
 
@@ -254,7 +256,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Check statuses of pending requests
       if (currentUser && currentUser.x_api_key && currentUser.x_secret_key) {
-        await checkPendingFundRequests(currentUser.id, currentUser.x_api_key.trim(), currentUser.x_secret_key.trim());
+        await checkPendingFundRequests(
+          currentUser.id,
+          currentUser.x_api_key.trim(),
+          currentUser.x_secret_key.trim(),
+          fundRequestsData || undefined,
+          activeProfiles.length > 0 ? activeProfiles : undefined
+        );
       }
     } catch (err) {
       console.warn('Supabase fetch notice: using local state fallback', err);
@@ -1049,17 +1057,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const checkPendingFundRequests = async (activeUserId: string, apiKey: string, secretKey: string) => {
-    const pending = fundRequests.filter(r => r.user_id === activeUserId && r.status === 'pending');
+  const checkPendingFundRequests = async (
+    activeUserId: string,
+    apiKey: string,
+    secretKey: string,
+    customRequests?: FundRequest[],
+    customUsers?: UserProfile[]
+  ) => {
+    const requestsToUse = customRequests || fundRequestsRef.current;
+    const usersToUse = customUsers || usersRef.current;
+
+    const currentUserProfile = usersToUse.find(u => u.id === activeUserId);
+    const isAdmin = currentUserProfile?.role === 'admin';
+
+    // If admin, check all pending requests. If user, check only their own.
+    const pending = requestsToUse.filter(r =>
+      isAdmin ? r.status === 'pending' : (r.user_id === activeUserId && r.status === 'pending')
+    );
+
     if (pending.length === 0) return;
 
     for (const req of pending) {
       try {
+        let reqApiKey = apiKey;
+        let reqSecretKey = secretKey;
+
+        // If admin, we must use the owner's credentials to query status
+        if (isAdmin) {
+          const owner = usersToUse.find(u => u.id === req.user_id);
+          if (!owner || !owner.x_api_key || !owner.x_secret_key) {
+            console.warn(`[Fund Request Sync] Skipping status check for request ${req.id}: Owner credentials not configured.`);
+            continue;
+          }
+          reqApiKey = owner.x_api_key.trim();
+          reqSecretKey = owner.x_secret_key.trim();
+        }
+
         const response = await fetch(`/api/v1/b2b/fund-request/status/${req.id}`, {
           method: 'GET',
           headers: {
-            'x-api-key': apiKey,
-            'x-secret-key': secretKey
+            'x-api-key': reqApiKey,
+            'x-secret-key': reqSecretKey
           }
         });
         if (response.ok) {
@@ -1101,6 +1139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Background Status Check Cron Job for Pending Transactions
   const billsRef = useRef(bills);
   const usersRef = useRef(users);
+  const fundRequestsRef = useRef(fundRequests);
   const isCheckingPendingRef = useRef(false);
 
   useEffect(() => {
@@ -1110,6 +1149,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     usersRef.current = users;
   }, [users]);
+
+  useEffect(() => {
+    fundRequestsRef.current = fundRequests;
+  }, [fundRequests]);
 
   const checkPendingStatus = async () => {
     const pendingBills = billsRef.current.filter((b) => b.status === 'Pending');
@@ -1149,7 +1192,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (resData.status === 'success' && resData.data) {
           const currentStatus = resData.data.current_status?.toLowerCase();
           if (currentStatus === 'success') {
-            // Update status to Success
             setBills((prev) => prev.map((b) => (b.id === bill.id ? { ...b, status: 'Success' } : b)));
 
             if (isSupabaseConfigured && supabase) {
@@ -1160,7 +1202,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             console.log(`>>> [Pending Status Cron] Transaction ${txnId} marked as Success.`);
           } else if (currentStatus === 'failed' || currentStatus === 'failure') {
-            // Update status to Failed
             setBills((prev) => prev.map((b) => (b.id === bill.id ? { ...b, status: 'Failed' } : b)));
 
             if (isSupabaseConfigured && supabase) {
@@ -1178,11 +1219,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const runCronChecks = async () => {
+    await checkPendingStatus();
+    if (currentUser) {
+      const apiKey = currentUser.x_api_key?.trim() || '';
+      const secretKey = currentUser.x_secret_key?.trim() || '';
+      await checkPendingFundRequests(currentUser.id, apiKey, secretKey);
+    }
+  };
+
   useEffect(() => {
     const timer = setInterval(() => {
       if (!isCheckingPendingRef.current) {
         isCheckingPendingRef.current = true;
-        checkPendingStatus().finally(() => {
+        runCronChecks().finally(() => {
           isCheckingPendingRef.current = false;
         });
       }
@@ -1192,7 +1242,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const startupTimer = setTimeout(() => {
       if (!isCheckingPendingRef.current) {
         isCheckingPendingRef.current = true;
-        checkPendingStatus().finally(() => {
+        runCronChecks().finally(() => {
           isCheckingPendingRef.current = false;
         });
       }
@@ -1202,7 +1252,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearInterval(timer);
       clearTimeout(startupTimer);
     };
-  }, []);
+  }, [currentUser]);
 
   return (
     <AuthContext.Provider
