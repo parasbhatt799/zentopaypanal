@@ -361,7 +361,7 @@ export const UserFundRequest: React.FC = () => {
           });
 
         if (uploadError) {
-          console.warn('Supabase storage upload failed, converting to local base64 fallback:', uploadError.message);
+          throw new Error(`Storage upload failed: ${uploadError.message}. Please ensure the 'receipts' bucket exists in Supabase and has public insert policies.`);
         } else {
           // Success! Get public URL
           const { data } = supabase.storage.from('receipts').getPublicUrl(filePath);
@@ -369,8 +369,9 @@ export const UserFundRequest: React.FC = () => {
             return data.publicUrl;
           }
         }
-      } catch (err) {
-        console.warn('Storage exception, using base64 fallback:', err);
+      } catch (err: any) {
+        console.error('Storage exception:', err);
+        throw new Error(err.message || 'Failed to upload receipt image to Supabase Storage.');
       }
     }
 
