@@ -106,10 +106,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     const users = getStoredUsers();
-    const savedId = localStorage.getItem('zentopay_active_user_id');
+    const savedId = sessionStorage.getItem('zentopay_active_user_id') || localStorage.getItem('zentopay_active_user_id');
     if (savedId) {
       const match = users.find((u) => u.id === savedId || u.phone === savedId || u.email === savedId);
       if (match) {
+        if (match.role === 'user' && !sessionStorage.getItem('zentopay_active_user_id')) {
+          localStorage.removeItem('zentopay_active_user_id');
+          return null;
+        }
         try {
           const storedPasswords = JSON.parse(localStorage.getItem('zentopay_user_passwords') || '{}');
           match.password = match.password || storedPasswords[match.id];
@@ -171,10 +175,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     saveUsers(users);
 
-    const savedId = localStorage.getItem('zentopay_active_user_id');
+    const savedId = sessionStorage.getItem('zentopay_active_user_id') || localStorage.getItem('zentopay_active_user_id');
     if (savedId) {
       const match = users.find((u) => u.id === savedId || u.phone === savedId || u.email === savedId);
       if (match) {
+        if (match.role === 'user' && !sessionStorage.getItem('zentopay_active_user_id')) {
+          localStorage.removeItem('zentopay_active_user_id');
+          if (currentUser !== null) {
+            setCurrentUser(null);
+          }
+          return;
+        }
         if (JSON.stringify(match) !== JSON.stringify(currentUser)) {
           setCurrentUser(match);
         }
@@ -357,12 +368,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setCurrentUser(target);
-    localStorage.setItem('zentopay_active_user_id', target.id);
+    if (target.role === 'user') {
+      sessionStorage.setItem('zentopay_active_user_id', target.id);
+      localStorage.removeItem('zentopay_active_user_id');
+    } else {
+      localStorage.setItem('zentopay_active_user_id', target.id);
+    }
   };
 
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem('zentopay_active_user_id');
+    sessionStorage.removeItem('zentopay_active_user_id');
   };
 
   const createNewUser = async (data: {
@@ -670,6 +687,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (currentUser?.id === userId) {
       setCurrentUser(null);
       localStorage.removeItem('zentopay_active_user_id');
+      sessionStorage.removeItem('zentopay_active_user_id');
     }
 
     if (isSupabaseConfigured && supabase) {
@@ -1251,6 +1269,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       clearInterval(timer);
       clearTimeout(startupTimer);
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'user') return;
+
+    localStorage.setItem('zentopay_last_activity', Date.now().toString());
+
+    let lastUpdate = Date.now();
+    const updateActivity = () => {
+      const now = Date.now();
+      if (now - lastUpdate > 5000) {
+        localStorage.setItem('zentopay_last_activity', now.toString());
+        lastUpdate = now;
+      }
+    };
+
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach((event) => window.addEventListener(event, updateActivity));
+
+    const interval = setInterval(() => {
+      const lastActivity = parseInt(localStorage.getItem('zentopay_last_activity') || '0', 10);
+      const now = Date.now();
+      const INACTIVITY_LIMIT = 10 * 60 * 1000;
+
+      if (now - lastActivity > INACTIVITY_LIMIT) {
+        console.log('Inactivity timeout reached. Logging out...');
+        logout();
+      }
+    }, 10000);
+
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, updateActivity));
+      clearInterval(interval);
     };
   }, [currentUser]);
 
