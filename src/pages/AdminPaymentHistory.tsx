@@ -1,11 +1,60 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { CreditCard, CheckCircle2, Clock, XCircle, Receipt, Search } from 'lucide-react';
+import { 
+  CreditCard, CheckCircle2, Clock, XCircle, Receipt, Search, 
+  RefreshCw, PlusCircle, X, AlertCircle, Sparkles, Building2, User, 
+  Calendar, Check, ShieldCheck 
+} from 'lucide-react';
 import { parsePaymentMethod } from './CreditCardBillPay';
+import type { TransactionStatus } from '../types';
+
+const PRESET_BILLERS = [
+  { id: 'SBIC00000NATDN', name: 'SBI Card' },
+  { id: 'INDU00000NATL1', name: 'IndusInd Credit Card' },
+  { id: 'ICIC00000NATSI', name: 'ICICI Credit card' },
+  { id: 'HDFCCARD00001', name: 'HDFC Bank Credit Card' },
+  { id: 'AXISCARD00001', name: 'Axis Bank Credit Card' },
+  { id: 'FEDE00000NATDL', name: 'Federal Bank Credit Card' },
+  { id: 'IDFC00000NATFQ', name: 'IDFC FIRST Bank Credit Card' },
+  { id: 'BOBCARD000001', name: 'Bank of Baroda Credit Card' },
+  { id: 'KOTAKCARD0001', name: 'Kotak Mahindra Bank Credit Card' },
+  { id: 'RBLC00000NAT01', name: 'RBL Bank Credit Card' },
+  { id: 'AUBK00000NAT01', name: 'AU Small Finance Bank Credit Card' },
+  { id: 'CUSTOM', name: 'Other / Custom Biller' },
+];
 
 export const AdminPaymentHistory: React.FC = () => {
-  const { bills, users } = useAuth();
+  const { bills, users, refreshData, addManualBill } = useAuth();
   const [receiptBill, setReceiptBill] = useState<any | null>(null);
+
+  // Sync state
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncToast, setSyncToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Add Missing Transaction Modal State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalError, setModalError] = useState('');
+
+  // Form Fields
+  const standardUsers = users.filter((u) => u.role === 'user');
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedBillerChoice, setSelectedBillerChoice] = useState<string>('SBIC00000NATDN');
+  const [customBankName, setCustomBankName] = useState('');
+  const [customBillerId, setCustomBillerId] = useState('');
+  const [cardDigits, setCardDigits] = useState('');
+  const [cardholderName, setCardholderName] = useState('');
+  const [customerMobile, setCustomerMobile] = useState('');
+  const [amount, setAmount] = useState('');
+  const [transactionRef, setTransactionRef] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<TransactionStatus>('Success');
+  const [methodName, setMethodName] = useState('UPI Instant Direct');
+  const [customDateTime, setCustomDateTime] = useState(() => {
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localISOTime = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+    return localISOTime;
+  });
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,7 +69,8 @@ export const AdminPaymentHistory: React.FC = () => {
     return {
       name: user ? user.full_name : 'Unknown User',
       email: user ? user.email : 'N/A',
-      initial: user ? user.full_name.charAt(0) : 'U',
+      phone: user ? user.phone : 'N/A',
+      initial: user ? user.full_name.charAt(0).toUpperCase() : 'U',
     };
   };
 
@@ -89,9 +139,174 @@ export const AdminPaymentHistory: React.FC = () => {
     return matchesSearch && matchesStatus && matchesDate;
   });
 
+  // Handle Sync Recent API Transactions
+  const handleSyncTransactions = async () => {
+    setIsSyncing(true);
+    setSyncToast(null);
+    try {
+      await refreshData();
+      setSyncToast({ message: 'Live transactions and database records synced successfully!', type: 'success' });
+    } catch (err: any) {
+      setSyncToast({ message: err?.message || 'Failed to sync with database.', type: 'error' });
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncToast(null), 4000);
+    }
+  };
+
+  // Handle Open Add Missing Transaction Modal
+  const handleOpenAddModal = () => {
+    const defaultUser = standardUsers.length > 0 ? standardUsers[0] : users[0];
+    if (defaultUser) {
+      setSelectedUserId(defaultUser.id);
+      setCardholderName(defaultUser.full_name);
+      setCustomerMobile(defaultUser.phone || '');
+    }
+    setSelectedBillerChoice('SBIC00000NATDN');
+    setCustomBankName('');
+    setCustomBillerId('');
+    setCardDigits('');
+    setAmount('');
+    setTransactionRef('');
+    setSelectedStatus('Success');
+    setMethodName('UPI Instant Direct');
+    setModalError('');
+    
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localISOTime = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+    setCustomDateTime(localISOTime);
+
+    setIsAddModalOpen(true);
+  };
+
+  // Handle User Change in Modal
+  const handleUserSelect = (uid: string) => {
+    setSelectedUserId(uid);
+    const u = users.find((item) => item.id === uid);
+    if (u) {
+      setCardholderName(u.full_name);
+      if (u.phone) setCustomerMobile(u.phone);
+    }
+  };
+
+  // Handle Form Submit for Manual Transaction Addition
+  const handleAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalError('');
+
+    if (!selectedUserId) {
+      setModalError('Please select a valid user.');
+      return;
+    }
+
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      setModalError('Please enter a valid paid amount (greater than 0).');
+      return;
+    }
+
+    const cleanRef = transactionRef.trim();
+    if (!cleanRef) {
+      setModalError('Please enter a valid Transaction / BBPS Reference Number.');
+      return;
+    }
+
+    // Check for duplicate reference
+    const duplicate = bills.find((b) => b.transaction_ref.toLowerCase() === cleanRef.toLowerCase());
+    if (duplicate) {
+      setModalError(`A transaction with reference "${cleanRef}" already exists in the database.`);
+      return;
+    }
+
+    // Determine Biller ID and Bank Name
+    let finalBillerId = selectedBillerChoice;
+    let finalBankName = '';
+
+    if (selectedBillerChoice === 'CUSTOM') {
+      finalBankName = customBankName.trim() || 'Custom Bank';
+      finalBillerId = customBillerId.trim() || 'GENERIC_BILLER';
+    } else {
+      const match = PRESET_BILLERS.find((pb) => pb.id === selectedBillerChoice);
+      finalBankName = match ? match.name : 'Credit Card';
+      finalBillerId = match ? match.id : selectedBillerChoice;
+    }
+
+    // Clean card number formatting
+    const rawDigits = cardDigits.replace(/\D/g, '');
+    const cleanCard = rawDigits.length >= 4 
+      ? `•••• •••• •••• ${rawDigits.slice(-4)}`
+      : rawDigits.length > 0 
+        ? `•••• •••• •••• ${rawDigits}` 
+        : '•••• •••• •••• XXXX';
+
+    const cleanMobile = customerMobile.replace(/\D/g, '') || '9876543210';
+    const finalPaymentMethod = `${methodName.trim() || 'UPI Instant Direct'}|${finalBillerId}|${cleanMobile}`;
+
+    // Convert local datetime to ISO string
+    let finalCreatedAt = new Date().toISOString();
+    if (customDateTime) {
+      try {
+        finalCreatedAt = new Date(customDateTime).toISOString();
+      } catch {
+        finalCreatedAt = new Date().toISOString();
+      }
+    }
+
+    setIsSubmitting(true);
+    try {
+      await addManualBill({
+        user_id: selectedUserId,
+        card_number: cleanCard,
+        cardholder_name: cardholderName.trim() || getUserInfo(selectedUserId).name,
+        bank_name: finalBankName,
+        amount: numAmount,
+        status: selectedStatus,
+        transaction_ref: cleanRef,
+        payment_method: finalPaymentMethod,
+        created_at: finalCreatedAt,
+      });
+
+      setIsAddModalOpen(false);
+      setSyncToast({
+        message: `Transaction ${cleanRef} successfully added to database!`,
+        type: 'success',
+      });
+      setTimeout(() => setSyncToast(null), 4000);
+    } catch (err: any) {
+      setModalError(err.message || 'Failed to insert transaction into database.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Title Header */}
+      {/* Toast Notification */}
+      {syncToast && (
+        <div className={`p-4 rounded-xl border flex items-center justify-between text-xs font-semibold animate-in fade-in duration-200 shadow-xl ${
+          syncToast.type === 'success'
+            ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300 shadow-emerald-950/40'
+            : 'bg-rose-950/80 border-rose-500/40 text-rose-300 shadow-rose-950/40'
+        }`}>
+          <div className="flex items-center space-x-2">
+            {syncToast.type === 'success' ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+            )}
+            <span>{syncToast.message}</span>
+          </div>
+          <button 
+            onClick={() => setSyncToast(null)}
+            className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Title Header with Action Buttons */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl glass-card border border-slate-800">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
@@ -102,9 +317,35 @@ export const AdminPaymentHistory: React.FC = () => {
             Log of all utility and credit card bill transactions executed by portal members.
           </p>
         </div>
-        <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
-          Total {filteredBills.length} Transactions
-        </span>
+
+        {/* Header Action Buttons */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Sync Button */}
+          <button
+            onClick={handleSyncTransactions}
+            disabled={isSyncing}
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white text-xs font-bold border border-slate-700 transition-all flex items-center space-x-2 shadow-sm hover:border-indigo-500/40 cursor-pointer disabled:opacity-50"
+            title="Fetch latest database records and verify status"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 text-indigo-400 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Syncing...' : 'Sync Recent API Transactions'}</span>
+          </button>
+
+          {/* Add Missing Transaction Button */}
+          <button
+            onClick={handleOpenAddModal}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all flex items-center space-x-2 shadow-lg shadow-indigo-600/30 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            title="Add a completed API transaction by BBPS Ref or Order ID"
+          >
+            <PlusCircle className="h-4 w-4" />
+            <span>Add Missing Transaction by Ref</span>
+          </button>
+
+          {/* Total Count Badge */}
+          <span className="text-xs font-semibold px-3 py-2 rounded-xl bg-slate-900 text-slate-300 border border-slate-800">
+            Total {filteredBills.length}
+          </span>
+        </div>
       </div>
 
       {/* Filter Controls Bar */}
@@ -115,7 +356,7 @@ export const AdminPaymentHistory: React.FC = () => {
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search all columns..."
+              placeholder="Search user, ref, bank, card, mobile..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 rounded-xl glass-input text-xs"
@@ -212,7 +453,7 @@ export const AdminPaymentHistory: React.FC = () => {
                     {/* User Info Column */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center space-x-2.5">
-                        <div className="h-7 w-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-indigo-400 text-xs">
+                        <div className="h-7 w-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-indigo-400 text-xs shrink-0">
                           {user.initial}
                         </div>
                         <div>
@@ -283,7 +524,7 @@ export const AdminPaymentHistory: React.FC = () => {
                     <td className="py-3.5 px-4 text-right">
                       <button
                         onClick={() => setReceiptBill(b)}
-                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold text-[11px] inline-flex items-center space-x-1 border border-slate-700 transition-all"
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold text-[11px] inline-flex items-center space-x-1 border border-slate-700 transition-all cursor-pointer"
                       >
                         <Receipt className="h-3.5 w-3.5" />
                         <span>Receipt</span>
@@ -303,6 +544,262 @@ export const AdminPaymentHistory: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Add Missing Transaction by Ref Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-2xl w-full glass-panel p-6 border border-indigo-500/30 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 my-8">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(false)}
+              className="absolute right-4 top-4 p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-slate-800">
+              <div className="p-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+                <PlusCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
+                  <span>Add Missing Transaction by Ref</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    UsePay / BBPS
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Directly record a successful or completed API transaction into database with reference ID.
+                </p>
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {modalError && (
+              <div className="p-3 mb-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleAddSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 1. Target User */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>Select User Profile *</span>
+                  </label>
+                  <select
+                    value={selectedUserId}
+                    onChange={(e) => handleUserSelect(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs cursor-pointer"
+                  >
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id} className="bg-slate-900 text-white">
+                        {u.full_name} ({u.phone || u.email}) {u.role === 'admin' ? '• Admin' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Biller Selection */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>Card Issuer / Biller *</span>
+                  </label>
+                  <select
+                    value={selectedBillerChoice}
+                    onChange={(e) => setSelectedBillerChoice(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs cursor-pointer"
+                  >
+                    {PRESET_BILLERS.map((b) => (
+                      <option key={b.id} value={b.id} className="bg-slate-900 text-white">
+                        {b.name} ({b.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Conditional Custom Biller Fields */}
+                {selectedBillerChoice === 'CUSTOM' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Custom Bank / Biller Name *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Yes Bank Credit Card"
+                        value={customBankName}
+                        onChange={(e) => setCustomBankName(e.target.value)}
+                        required
+                        className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Custom Biller ID *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. YESB00000NAT01"
+                        value={customBillerId}
+                        onChange={(e) => setCustomBillerId(e.target.value)}
+                        required
+                        className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* 3. Transaction / BBPS Reference ID */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>BBPS / UsePay Ref ID *</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. BBPSU6443965946 or CC01RS..."
+                    value={transactionRef}
+                    onChange={(e) => setTransactionRef(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono text-indigo-300 font-bold placeholder-slate-500"
+                  />
+                </div>
+
+                {/* 4. Paid Amount */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    <span>Paid Amount (₹) *</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    placeholder="e.g. 21199.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono font-bold text-white placeholder-slate-500"
+                  />
+                </div>
+
+                {/* 5. Card Last Digits / Number */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    <span>Card Number / Last 4 Digits</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 6678"
+                    maxLength={19}
+                    value={cardDigits}
+                    onChange={(e) => setCardDigits(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono text-slate-200"
+                  />
+                </div>
+
+                {/* 6. Customer Mobile */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Customer Mobile Number</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 8780182013"
+                    maxLength={10}
+                    value={customerMobile}
+                    onChange={(e) => setCustomerMobile(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono text-slate-200"
+                  />
+                </div>
+
+                {/* 7. Cardholder Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Cardholder Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. PARTH RAJESHBHAI PATEL"
+                    value={cardholderName}
+                    onChange={(e) => setCardholderName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-slate-200 uppercase"
+                  />
+                </div>
+
+                {/* 8. Transaction Status */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Transaction Status</label>
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value as TransactionStatus)}
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs cursor-pointer font-bold"
+                  >
+                    <option value="Success" className="bg-slate-900 text-emerald-400">Success</option>
+                    <option value="Pending" className="bg-slate-900 text-amber-400">Pending</option>
+                    <option value="Failed" className="bg-slate-900 text-rose-400">Failed</option>
+                  </select>
+                </div>
+
+                {/* 9. Payment Date & Time */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>Transaction Date & Time</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={customDateTime}
+                    onChange={(e) => setCustomDateTime(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-slate-200"
+                  />
+                </div>
+
+                {/* 10. Payment Method Gateway */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Payment Method / Gateway</label>
+                  <input
+                    type="text"
+                    value={methodName}
+                    onChange={(e) => setMethodName(e.target.value)}
+                    placeholder="UPI Instant Direct"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-slate-300"
+                  />
+                </div>
+              </div>
+
+              {/* Form Action Buttons */}
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-800 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/30 flex items-center space-x-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Saving to Database...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" />
+                      <span>Save & Sync Entry</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Payment Receipt Modal */}
       {receiptBill && (
@@ -379,7 +876,7 @@ export const AdminPaymentHistory: React.FC = () => {
 
             <button
               onClick={() => setReceiptBill(null)}
-              className="mt-6 w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors shadow-lg shadow-indigo-600/30"
+              className="mt-6 w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors shadow-lg shadow-indigo-600/30 cursor-pointer"
             >
               Done & Close
             </button>

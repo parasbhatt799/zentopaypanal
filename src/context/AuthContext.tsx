@@ -92,6 +92,17 @@ interface AuthContextType {
     mobile?: string;
     customerPan?: string;
   }) => Promise<CreditCardBill>;
+  addManualBill: (billData: {
+    user_id: string;
+    card_number: string;
+    cardholder_name: string;
+    bank_name: string;
+    amount: number;
+    status: TransactionStatus;
+    transaction_ref: string;
+    payment_method: string;
+    created_at?: string;
+  }) => Promise<CreditCardBill>;
   refreshData: () => Promise<void>;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
@@ -982,6 +993,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const addManualBill = async (billData: {
+    user_id: string;
+    card_number: string;
+    cardholder_name: string;
+    bank_name: string;
+    amount: number;
+    status: TransactionStatus;
+    transaction_ref: string;
+    payment_method: string;
+    created_at?: string;
+  }): Promise<CreditCardBill> => {
+    const newBill: CreditCardBill = {
+      id: `b-${Date.now()}`,
+      user_id: billData.user_id,
+      card_number: billData.card_number,
+      cardholder_name: billData.cardholder_name,
+      bank_name: billData.bank_name,
+      amount: Number(billData.amount),
+      status: billData.status,
+      transaction_ref: billData.transaction_ref.trim(),
+      payment_method: billData.payment_method,
+      created_at: billData.created_at || new Date().toISOString(),
+    };
+
+    setBills((prev) => [newBill, ...prev]);
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('credit_card_bills').insert({
+        user_id: newBill.user_id,
+        card_number: newBill.card_number,
+        cardholder_name: newBill.cardholder_name,
+        bank_name: newBill.bank_name,
+        amount: newBill.amount,
+        status: newBill.status,
+        transaction_ref: newBill.transaction_ref,
+        payment_method: newBill.payment_method,
+        created_at: newBill.created_at,
+      }).select();
+
+      if (error) {
+        console.error('Supabase manual bill insert error:', error);
+        throw new Error(error.message || 'Failed to save bill to database.');
+      }
+
+      if (data && data[0]) {
+        newBill.id = data[0].id;
+      }
+    }
+
+    return newBill;
+  };
+
   const submitFundRequest = async (
     amount: number,
     utrNumber: string,
@@ -1329,6 +1392,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateUser,
         updateMaintenance,
         payBill,
+        addManualBill,
         refreshData,
         theme,
         toggleTheme,
