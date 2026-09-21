@@ -104,6 +104,7 @@ interface AuthContextType {
     created_at?: string;
   }) => Promise<CreditCardBill>;
   refreshData: () => Promise<void>;
+  checkBillStatus: (billId: string, customId?: string) => Promise<{ success: boolean; status: TransactionStatus; message: string; data?: any }>;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
   fundRequests: FundRequest[];
@@ -878,7 +879,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       requestPayload.additionalInfo = additionalInfo;
     }
 
+    // Generate unique Custom Client Order ID upfront (e.g. TXN_ORD_20260921123456_789)
+    const now = new Date();
+    const datePart = now.toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+    const randPart = Math.floor(1000 + Math.random() * 9000);
+    const clientTxnId = `TXN_ORD_${datePart}_${randPart}`;
+
+    requestPayload.client_transaction_id = clientTxnId;
+
     console.log(">>> [UsePay API Request] PAYLOAD SENT:", requestPayload);
+
+    let resData: any = null;
+    let networkOrTimeoutError: any = null;
 
     try {
       const response = await fetch('/api/v1/b2b/pay-bill', {
@@ -891,88 +903,126 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify(requestPayload),
       });
 
-      const resData = await response.json();
+      try {
+        resData = await response.json();
+      } catch (jsonErr) {
+        console.warn('Could not parse JSON response from UsePay:', jsonErr);
+      }
       console.log("<<< [UsePay API Response] RECEIVED:", resData);
 
-      const extError = resData.ExtBillPayResponse?.errorInfo?.error?.errorMessage;
-      const gatewayError = resData.message || resData.data?.message;
-
-      if (!response.ok || resData.status === 'error' || resData.status === 'failed' || resData.payment_status === 'failed' || extError) {
-        const errMsg = extError || gatewayError || 'Transaction rejected by UsePay gateway.';
-
-        // Record the failed transaction in the database and state so it shows in history
-        const baseRef = resData.transaction_id || resData.data?.billPayResponse?.txnReferenceId || `USEPAY_FAIL_${Math.floor(100000 + Math.random() * 900000)}`;
-        const approvalRef = resData.ExtBillPayResponse?.approvalRefNumber;
-        const finalRef = approvalRef ? `${baseRef} (Approval: ${approvalRef})` : baseRef;
-
-        const failedBill: CreditCardBill = {
-          ...billData,
-          id: `b-${Date.now()}`,
-          status: 'Failed',
-          transaction_ref: finalRef,
-          created_at: new Date().toISOString(),
-          payment_method: `${billData.payment_method}|${billerId}|${userPhone}`,
-        };
-
-        setBills((prev) => [failedBill, ...prev]);
-
-        if (isSupabaseConfigured && supabase) {
-          await supabase.from('credit_card_bills').insert({
-            user_id: failedBill.user_id,
-            card_number: failedBill.card_number,
-            cardholder_name: failedBill.cardholder_name,
-            bank_name: failedBill.bank_name,
-            amount: failedBill.amount,
-            status: failedBill.status,
-            transaction_ref: failedBill.transaction_ref,
-            payment_method: failedBill.payment_method,
-          });
-        }
-
-        throw new Error(errMsg);
+      if (!response.ok) {
+        networkOrTimeoutError = new Error(`HTTP ${response.status}: ${resData?.message || response.statusText || 'Gateway timeout or server error'}`);
       }
+    } catch (fetchErr: any) {
+      console.error('UsePay Network/Fetch Error:', fetchErr);
+      networkOrTimeoutError = fetchErr;
+    }
 
-      // Live payment succeeded!
-      const baseRef = resData.transaction_id || resData.data?.billPayResponse?.txnReferenceId || `USEPAY${Math.floor(100000 + Math.random() * 900000)}`;
-      const approvalRef = resData.ExtBillPayResponse?.approvalRefNumber;
-      const finalRef = approvalRef ? `${baseRef} (Approval: ${approvalRef})` : baseRef;
-
-      // Determine initial transaction status based on API response
-      let initialStatus: TransactionStatus = 'Success';
-      const responseStatus = (resData.payment_status || resData.status || resData.data?.current_status || '').toLowerCase();
-      if (responseStatus === 'pending') {
-        initialStatus = 'Pending';
-      }
-
-      const newBill: CreditCardBill = {
+    // 1. Timeout / Network Failure Protection (NEVER SKIP ENTRY)
+    if (networkOrTimeoutError || !resData) {
+      console.warn(">>> [payBill] Network timeout or connection drop detected. Creating PENDING transaction with Client Order ID:", clientTxnId);
+      const pendingBill: CreditCardBill = {
         ...billData,
         id: `b-${Date.now()}`,
-        status: initialStatus,
-        transaction_ref: finalRef,
+        status: 'Pending',
+        transaction_ref: clientTxnId,
         created_at: new Date().toISOString(),
-        payment_method: `${billData.payment_method}|${billerId}|${userPhone}`,
+        payment_method: `${billData.payment_method}|${billerId}|${userPhone}|${clientTxnId}`,
+        client_transaction_id: clientTxnId,
       };
 
-      const updatedUsers = users.map((u) => {
-        if (u.id === billData.user_id) {
-          return {
-            ...u,
-            wallet_balance: Math.max(0, u.wallet_balance - billData.amount),
-          };
-        }
-        return u;
-      });
-
-      setBills([newBill, ...bills]);
-      setUsers(updatedUsers);
-
-      if (currentUser?.id === billData.user_id) {
-        setCurrentUser((prev) =>
-          prev ? { ...prev, wallet_balance: Math.max(0, prev.wallet_balance - billData.amount) } : prev
-        );
-      }
+      setBills((prev) => [pendingBill, ...prev.filter(b => b.id !== pendingBill.id)]);
 
       if (isSupabaseConfigured && supabase) {
+        try {
+          await supabase.from('credit_card_bills').insert({
+            user_id: pendingBill.user_id,
+            card_number: pendingBill.card_number,
+            cardholder_name: pendingBill.cardholder_name,
+            bank_name: pendingBill.bank_name,
+            amount: pendingBill.amount,
+            status: pendingBill.status,
+            transaction_ref: pendingBill.transaction_ref,
+            payment_method: pendingBill.payment_method,
+          });
+        } catch (dbErr) {
+          console.error("Failed to insert pending bill to Supabase:", dbErr);
+        }
+      }
+
+      return pendingBill;
+    }
+
+    // 2. Gateway Response Handling
+    const extError = resData.ExtBillPayResponse?.errorInfo?.error?.errorMessage;
+    const gatewayError = resData.message || resData.data?.message;
+    const apiTxnId = resData.transaction_id || resData.data?.billPayResponse?.txnReferenceId;
+    const approvalRef = resData.ExtBillPayResponse?.approvalRefNumber;
+    const baseRef = apiTxnId || clientTxnId;
+    const finalRef = approvalRef ? `${baseRef} (Approval: ${approvalRef})` : baseRef;
+
+    const isApiError = resData.status === 'error' || resData.status === 'failed' || resData.payment_status === 'failed' || Boolean(extError);
+
+    // If API returned error/failure, save as 'Pending' so status check can query and resolve it live
+    if (isApiError) {
+      console.warn(">>> [payBill] Gateway returned failure/pending message. Saving as 'Pending' for live verification:", extError || gatewayError);
+      const pendingBill: CreditCardBill = {
+        ...billData,
+        id: `b-${Date.now()}`,
+        status: 'Pending',
+        transaction_ref: finalRef,
+        created_at: new Date().toISOString(),
+        payment_method: `${billData.payment_method}|${billerId}|${userPhone}|${clientTxnId}`,
+        client_transaction_id: clientTxnId,
+        api_transaction_id: apiTxnId || undefined,
+        bbps_ref_id: approvalRef || undefined,
+      };
+
+      setBills((prev) => [pendingBill, ...prev.filter(b => b.id !== pendingBill.id)]);
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          await supabase.from('credit_card_bills').insert({
+            user_id: pendingBill.user_id,
+            card_number: pendingBill.card_number,
+            cardholder_name: pendingBill.cardholder_name,
+            bank_name: pendingBill.bank_name,
+            amount: pendingBill.amount,
+            status: pendingBill.status,
+            transaction_ref: pendingBill.transaction_ref,
+            payment_method: pendingBill.payment_method,
+          });
+        } catch (dbErr) {
+          console.error("Failed to insert pending bill to Supabase:", dbErr);
+        }
+      }
+
+      return pendingBill;
+    }
+
+    // 3. Normal / Success API Response
+    let initialStatus: TransactionStatus = 'Success';
+    const responseStatus = (resData.payment_status || resData.status || resData.data?.current_status || '').toLowerCase();
+    if (responseStatus === 'pending') {
+      initialStatus = 'Pending';
+    }
+
+    const newBill: CreditCardBill = {
+      ...billData,
+      id: `b-${Date.now()}`,
+      status: initialStatus,
+      transaction_ref: finalRef,
+      created_at: new Date().toISOString(),
+      payment_method: `${billData.payment_method}|${billerId}|${userPhone}|${clientTxnId}`,
+      client_transaction_id: clientTxnId,
+      api_transaction_id: apiTxnId || undefined,
+      bbps_ref_id: approvalRef || undefined,
+    };
+
+    setBills((prev) => [newBill, ...prev.filter(b => b.id !== newBill.id)]);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
         await supabase.from('credit_card_bills').insert({
           user_id: newBill.user_id,
           card_number: newBill.card_number,
@@ -983,14 +1033,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           transaction_ref: newBill.transaction_ref,
           payment_method: newBill.payment_method,
         });
+      } catch (dbErr) {
+        console.error("Failed to insert new bill to Supabase:", dbErr);
       }
-
-      return newBill;
-
-    } catch (apiErr: any) {
-      console.error('UsePay API Error:', apiErr);
-      throw new Error(apiErr.message || 'Connection timeout with UsePay API.');
     }
+
+    return newBill;
   };
 
   const addManualBill = async (billData: {
@@ -1235,6 +1283,147 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fundRequestsRef.current = fundRequests;
   }, [fundRequests]);
 
+  const checkBillStatus = async (
+    billId: string,
+    customId?: string
+  ): Promise<{ success: boolean; status: TransactionStatus; message: string; data?: any }> => {
+    const bill = billsRef.current.find((b) => b.id === billId) || bills.find((b) => b.id === billId);
+    if (!bill) {
+      throw new Error('Transaction record not found.');
+    }
+
+    const owner = usersRef.current.find((u) => u.id === bill.user_id) || currentUser;
+    if (!owner || !owner.x_api_key || !owner.x_secret_key) {
+      throw new Error('User API credentials (x-api-key, x-secret-key) not configured in profile.');
+    }
+
+    // Parse payment method to find clientTxnId if stored
+    let clientOrderId = bill.client_transaction_id;
+    if (!clientOrderId && bill.payment_method && bill.payment_method.includes('|')) {
+      const parts = bill.payment_method.split('|');
+      if (parts[3]) {
+        clientOrderId = parts[3];
+      }
+    }
+    if (!clientOrderId && bill.transaction_ref.startsWith('TXN_ORD_')) {
+      clientOrderId = bill.transaction_ref.split(' ')[0];
+    }
+
+    let apiTxnId = bill.api_transaction_id;
+    const refToken = bill.transaction_ref.split(' ')[0];
+    if (!apiTxnId && refToken && !refToken.startsWith('TXN_ORD_') && !refToken.startsWith('USEPAY_')) {
+      apiTxnId = refToken;
+    }
+
+    // Build ordered list of candidate query IDs (API Transaction ID & Custom Client Order ID)
+    const candidates: string[] = [];
+    if (customId && customId.trim()) candidates.push(customId.trim());
+    if (apiTxnId && !candidates.includes(apiTxnId)) candidates.push(apiTxnId);
+    if (clientOrderId && !candidates.includes(clientOrderId)) candidates.push(clientOrderId);
+    if (refToken && !candidates.includes(refToken)) candidates.push(refToken);
+
+    let statusData: any = null;
+    let lastError: string = 'No response from status check gateway.';
+
+    for (const queryId of candidates) {
+      try {
+        console.log(`>>> [Live Status Check] Querying UsePay status with ID: "${queryId}"...`);
+        const url = `/api/v1/b2b/status/${encodeURIComponent(queryId)}`;
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'x-api-key': owner.x_api_key.trim(),
+            'x-secret-key': owner.x_secret_key.trim(),
+          },
+        });
+
+        if (!res.ok) {
+          console.warn(`[Live Status Check] ID "${queryId}" returned HTTP status ${res.status}`);
+          continue;
+        }
+
+        const resJson = await res.json();
+        console.log(`<<< [Live Status Check] Response for "${queryId}":`, resJson);
+
+        if (resJson.status === 'success' && resJson.data) {
+          statusData = resJson.data;
+          break;
+        } else if (resJson.message) {
+          lastError = resJson.message;
+        }
+      } catch (err: any) {
+        lastError = err?.message || lastError;
+      }
+    }
+
+    if (!statusData) {
+      throw new Error(`Could not verify status from UsePay. ${lastError}`);
+    }
+
+    const currentStatusRaw = (statusData.current_status || statusData.bbps_status || statusData.status || '').toLowerCase();
+    let newStatus: TransactionStatus = bill.status;
+
+    if (currentStatusRaw === 'success' || currentStatusRaw === 'completed') {
+      newStatus = 'Success';
+    } else if (currentStatusRaw === 'failed' || currentStatusRaw === 'failure' || currentStatusRaw === 'rejected' || currentStatusRaw.includes('failed')) {
+      newStatus = 'Failed';
+    } else if (currentStatusRaw === 'pending' || currentStatusRaw === 'processing') {
+      newStatus = 'Pending';
+    }
+
+    // Extract identifiers returned by API
+    const returnedApiTxnId = statusData.transaction_id || apiTxnId;
+    const returnedBbpsRef = (statusData.bbps_txn_ref_id && statusData.bbps_txn_ref_id !== 'N/A') ? statusData.bbps_txn_ref_id : bill.bbps_ref_id;
+    const returnedClientOrderId = statusData.client_transaction_id || clientOrderId;
+
+    let updatedTxnRef = bill.transaction_ref;
+    if (returnedBbpsRef && returnedApiTxnId) {
+      updatedTxnRef = `${returnedApiTxnId} (BBPS: ${returnedBbpsRef})`;
+    } else if (returnedApiTxnId) {
+      updatedTxnRef = returnedApiTxnId;
+    } else if (returnedClientOrderId && bill.transaction_ref.startsWith('USEPAY_')) {
+      updatedTxnRef = returnedClientOrderId;
+    }
+
+    // Update in state
+    setBills((prev) =>
+      prev.map((b) =>
+        b.id === bill.id
+          ? {
+              ...b,
+              status: newStatus,
+              transaction_ref: updatedTxnRef,
+              api_transaction_id: returnedApiTxnId,
+              bbps_ref_id: returnedBbpsRef,
+              client_transaction_id: returnedClientOrderId,
+            }
+          : b
+      )
+    );
+
+    // Update in Supabase
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('credit_card_bills')
+          .update({
+            status: newStatus,
+            transaction_ref: updatedTxnRef,
+          })
+          .eq('id', bill.id);
+      } catch (dbErr) {
+        console.error("Failed to update bill in Supabase:", dbErr);
+      }
+    }
+
+    return {
+      success: true,
+      status: newStatus,
+      message: statusData.message || `Transaction is ${newStatus}.`,
+      data: statusData,
+    };
+  };
+
   const checkPendingStatus = async () => {
     const pendingBills = billsRef.current.filter((b) => b.status === 'Pending');
     if (pendingBills.length === 0) return;
@@ -1243,59 +1432,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     for (const bill of pendingBills) {
       try {
-        const owner = usersRef.current.find((u) => u.id === bill.user_id);
-        if (!owner || !owner.x_api_key || !owner.x_secret_key) {
-          console.warn(`>>> [Pending Status Cron] Skipping status check for bill ${bill.id}: User API credentials not configured.`);
-          continue;
-        }
-
-        const txnId = bill.transaction_ref.split(' ')[0];
-        const url = `/api/v1/b2b/status/${txnId}`;
-
-        console.log(`>>> [Pending Status Cron] Checking status for ${txnId}...`);
-
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'x-api-key': owner.x_api_key.trim(),
-            'x-secret-key': owner.x_secret_key.trim(),
-          },
-        });
-
-        if (!response.ok) {
-          console.error(`>>> [Pending Status Cron] API request failed for ${txnId}: ${response.statusText}`);
-          continue;
-        }
-
-        const resData = await response.json();
-        console.log(`<<< [Pending Status Cron] Response for ${txnId}:`, resData);
-
-        if (resData.status === 'success' && resData.data) {
-          const currentStatus = resData.data.current_status?.toLowerCase();
-          if (currentStatus === 'success') {
-            setBills((prev) => prev.map((b) => (b.id === bill.id ? { ...b, status: 'Success' } : b)));
-
-            if (isSupabaseConfigured && supabase) {
-              await supabase
-                .from('credit_card_bills')
-                .update({ status: 'Success' })
-                .eq('id', bill.id);
-            }
-            console.log(`>>> [Pending Status Cron] Transaction ${txnId} marked as Success.`);
-          } else if (currentStatus === 'failed' || currentStatus === 'failure') {
-            setBills((prev) => prev.map((b) => (b.id === bill.id ? { ...b, status: 'Failed' } : b)));
-
-            if (isSupabaseConfigured && supabase) {
-              await supabase
-                .from('credit_card_bills')
-                .update({ status: 'Failed' })
-                .eq('id', bill.id);
-            }
-            console.log(`>>> [Pending Status Cron] Transaction ${txnId} marked as Failed.`);
-          }
-        }
+        await checkBillStatus(bill.id);
       } catch (err) {
-        console.error(`>>> [Pending Status Cron] Error checking status for bill ${bill.id}:`, err);
+        console.warn(`>>> [Pending Status Cron] Failed to check status for bill ${bill.id}:`, err);
       }
     }
   };
@@ -1394,6 +1533,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         payBill,
         addManualBill,
         refreshData,
+        checkBillStatus,
         theme,
         toggleTheme,
         fundRequests,

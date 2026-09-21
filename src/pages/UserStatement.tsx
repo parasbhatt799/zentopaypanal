@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { parsePaymentMethod } from './CreditCardBillPay';
 import { 
   FileText, Search, Download, ArrowUpRight, ArrowDownRight, 
-  Calendar, CheckCircle2, Clock, XCircle, Filter, Info 
+  Calendar, CheckCircle2, Clock, XCircle, Filter, Info, RefreshCw 
 } from 'lucide-react';
 
 interface UnifiedTransaction {
@@ -15,11 +15,14 @@ interface UnifiedTransaction {
   status: string;
   description: string;
   runningBalance: number;
+  clientTxnId?: string;
 }
 
 export const UserStatement: React.FC = () => {
-  const { currentUser, bills, fundRequests } = useAuth();
+  const { currentUser, bills, fundRequests, checkBillStatus } = useAuth();
   const [apiBalance, setApiBalance] = useState<number | null>(null);
+  const [checkingTxId, setCheckingTxId] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,6 +58,22 @@ export const UserStatement: React.FC = () => {
     fetchBalance();
   }, [currentUser?.x_api_key, currentUser?.x_secret_key]);
 
+  const handleCheckStatus = async (billId: string) => {
+    setCheckingTxId(billId);
+    try {
+      const res = await checkBillStatus(billId);
+      setToastMsg({ 
+        message: `Status: ${res.status}! ${res.message || ''}`, 
+        type: res.status === 'Success' ? 'success' : 'error' 
+      });
+    } catch (err: any) {
+      setToastMsg({ message: err?.message || 'Failed to check status with UsePay.', type: 'error' });
+    } finally {
+      setCheckingTxId(null);
+      setTimeout(() => setToastMsg(null), 5000);
+    }
+  };
+
   const currentBalance = apiBalance !== null ? apiBalance : (currentUser?.wallet_balance || 0);
 
   // Filter user bills and fund requests
@@ -72,7 +91,8 @@ export const UserStatement: React.FC = () => {
         refId: b.transaction_ref,
         amount: b.amount,
         status: b.status,
-        description: `Credit Card Bill Pay (${b.bank_name} - ${b.card_number}) via ${parsed.method}`
+        description: `Credit Card Bill Pay (${b.bank_name} - ${b.card_number}) via ${parsed.method}`,
+        clientTxnId: b.client_transaction_id || parsed.clientTxnId
       };
     }),
     ...userFundRequests.map((r) => ({
@@ -210,6 +230,18 @@ export const UserStatement: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center justify-between animate-fadeIn shadow-xl ${
+          toastMsg.type === 'success' 
+            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' 
+            : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+        }`}>
+          <span>{toastMsg.message}</span>
+          <button onClick={() => setToastMsg(null)} className="text-slate-400 hover:text-white ml-2 text-xs">✕</button>
+        </div>
+      )}
+
       {/* Title Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl glass-card border border-slate-800">
         <div>
@@ -391,8 +423,11 @@ export const UserStatement: React.FC = () => {
                     </td>
 
                     {/* Reference / UTR */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-300">
-                      {tx.refId}
+                    <td className="py-3.5 px-4 font-mono text-slate-300">
+                      <div className="font-bold text-xs">{tx.refId}</div>
+                      {tx.clientTxnId && tx.clientTxnId !== tx.refId && (
+                        <div className="text-[10px] text-indigo-400 font-normal mt-0.5">Order: {tx.clientTxnId}</div>
+                      )}
                     </td>
 
                     {/* Description */}
@@ -414,7 +449,7 @@ export const UserStatement: React.FC = () => {
                     </td>
 
                     {/* Amount */}
-                    <td className="py-3.5 px-4 font-bold font-mono">
+                    <td className="py-3.5 px-4 font-mono font-bold">
                       {tx.type === 'credit' ? (
                         <span className="text-emerald-400">
                           +₹{tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -431,17 +466,30 @@ export const UserStatement: React.FC = () => {
                       {tx.status === 'approved' || tx.status === 'Success' ? (
                         <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                           <CheckCircle2 className="h-3 w-3" />
-                          <span>Approved</span>
+                          <span>Success</span>
                         </span>
                       ) : tx.status === 'pending' || tx.status === 'Pending' ? (
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
-                          <Clock className="h-3 w-3" />
-                          <span>Pending</span>
-                        </span>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+                            <Clock className="h-3 w-3" />
+                            <span>Pending</span>
+                          </span>
+                          {tx.type === 'debit' && (
+                            <button
+                              type="button"
+                              onClick={() => handleCheckStatus(tx.id)}
+                              disabled={checkingTxId === tx.id}
+                              title="Check Live Status with UsePay API"
+                              className="p-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-all hover:scale-105 inline-flex items-center"
+                            >
+                              <RefreshCw className={`h-3 w-3 ${checkingTxId === tx.id ? 'animate-spin' : ''}`} />
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
                           <XCircle className="h-3 w-3" />
-                          <span>Rejected</span>
+                          <span>Failed</span>
                         </span>
                       )}
                     </td>

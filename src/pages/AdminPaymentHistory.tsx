@@ -24,12 +24,13 @@ const PRESET_BILLERS = [
 ];
 
 export const AdminPaymentHistory: React.FC = () => {
-  const { bills, users, refreshData, addManualBill } = useAuth();
+  const { bills, users, refreshData, addManualBill, checkBillStatus } = useAuth();
   const [receiptBill, setReceiptBill] = useState<any | null>(null);
 
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncToast, setSyncToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [checkingAdminBillId, setCheckingAdminBillId] = useState<string | null>(null);
 
   // Add Missing Transaction Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -151,6 +152,23 @@ export const AdminPaymentHistory: React.FC = () => {
     } finally {
       setIsSyncing(false);
       setTimeout(() => setSyncToast(null), 4000);
+    }
+  };
+
+  // Handle Live Status Check from UsePay
+  const handleAdminCheckStatus = async (billId: string) => {
+    setCheckingAdminBillId(billId);
+    try {
+      const res = await checkBillStatus(billId);
+      setSyncToast({
+        message: `Status updated: ${res.status}! ${res.message || ''}`,
+        type: res.status === 'Success' ? 'success' : 'error'
+      });
+    } catch (err: any) {
+      setSyncToast({ message: err?.message || 'Failed to check status with UsePay API.', type: 'error' });
+    } finally {
+      setCheckingAdminBillId(null);
+      setTimeout(() => setSyncToast(null), 5000);
     }
   };
 
@@ -482,7 +500,12 @@ export const AdminPaymentHistory: React.FC = () => {
                     <td className="py-3.5 px-4 font-mono text-slate-300">{parsed.mobile}</td>
 
                     {/* Ref Number Column */}
-                    <td className="py-3.5 px-4 font-mono text-indigo-400 font-semibold">{b.transaction_ref}</td>
+                    <td className="py-3.5 px-4 font-mono text-indigo-400 font-semibold text-xs">
+                      <div>{b.transaction_ref}</div>
+                      {(b.client_transaction_id || parsed.clientTxnId) && (b.client_transaction_id || parsed.clientTxnId) !== b.transaction_ref && (
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">Order: {b.client_transaction_id || parsed.clientTxnId}</div>
+                      )}
+                    </td>
 
                     {/* Bank Name Column */}
                     <td className="py-3.5 px-4 font-semibold text-slate-200">{b.bank_name}</td>
@@ -507,10 +530,21 @@ export const AdminPaymentHistory: React.FC = () => {
                         </span>
                       )}
                       {b.status === 'Pending' && (
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
-                          <Clock className="h-3 w-3" />
-                          <span>Pending</span>
-                        </span>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+                            <Clock className="h-3 w-3" />
+                            <span>Pending</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleAdminCheckStatus(b.id)}
+                            disabled={checkingAdminBillId === b.id}
+                            title="Check Live Status with UsePay API"
+                            className="p-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-all hover:scale-105 inline-flex items-center cursor-pointer"
+                          >
+                            <RefreshCw className={`h-3 w-3 ${checkingAdminBillId === b.id ? 'animate-spin' : ''}`} />
+                          </button>
+                        </div>
                       )}
                       {b.status === 'Failed' && (
                         <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">

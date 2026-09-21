@@ -41,6 +41,9 @@ export interface CreditCardBill {
   transaction_ref: string;
   payment_method: string;
   created_at: string;
+  client_transaction_id?: string;
+  api_transaction_id?: string;
+  bbps_ref_id?: string;
 }
 
 export interface MaintenanceConfig {

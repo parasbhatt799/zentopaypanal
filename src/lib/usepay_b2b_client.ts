@@ -57,6 +57,23 @@ export interface PayBillRequest {
   billerResponseInfo?: any; // Raw response from fetch-bill or customized fallback object
   customerPan?: string;     // Required for payments >= 50,000 INR
   customerNameFallback?: string; // Used if billing details aren't fetched beforehand
+  client_transaction_id?: string; // Custom Client Order ID (e.g. TXN_ORD_...)
+}
+
+export interface TransactionStatusResponse {
+  status?: 'success' | 'failed' | 'error';
+  message?: string;
+  data?: {
+    transaction_id?: string;
+    client_transaction_id?: string;
+    bbps_txn_ref_id?: string;
+    current_status?: string;
+    bbps_status?: string;
+    polled_at?: string;
+    message?: string;
+    refund_status?: string;
+    refunded_amount?: number;
+  };
 }
 
 export interface PayBillResponse {
@@ -282,6 +299,10 @@ export class UsePayB2BClient {
       requestPayload.fetchRequestId = fetchRequestId;
     }
 
+    if (req.client_transaction_id) {
+      requestPayload.client_transaction_id = req.client_transaction_id;
+    }
+
     if (additionalInfo) {
       requestPayload.additionalInfo = additionalInfo;
     }
@@ -316,5 +337,25 @@ export class UsePayB2BClient {
       approvalRef: approvalRef,
       status: transactionStatus
     };
+  }
+
+  /**
+   * 6. GET /status/:transaction_id
+   * Check Live Transaction Status using:
+   * 1. API Transaction ID (e.g. BBPSU1283118228)
+   * 2. Custom Client Order ID (e.g. TXN_ORD_20260814_001)
+   * 3. Fetch Request ID
+   * 4. BillAvenue Reference ID (e.g. CC01...)
+   */
+  async checkTransactionStatus(id: string): Promise<TransactionStatusResponse['data']> {
+    const cleanId = encodeURIComponent(id.trim());
+    const res = await this.request<TransactionStatusResponse>(`/api/v1/b2b/status/${cleanId}`, {
+      method: 'GET',
+    });
+
+    if (res.status === 'success' && res.data) {
+      return res.data;
+    }
+    throw new Error(res.message || 'Failed to check transaction status.');
   }
 }

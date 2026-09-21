@@ -4,13 +4,15 @@ import type { CreditCardBill } from '../types';
 import { parsePaymentMethod } from './CreditCardBillPay';
 import { 
   Receipt, Search, Clock, CheckCircle2, XCircle, 
-  History, Calendar, Filter, FileText, ChevronRight, X 
+  History, Calendar, Filter, FileText, ChevronRight, X, RefreshCw 
 } from 'lucide-react';
 
 export const UserBillHistory: React.FC = () => {
-  const { currentUser, bills } = useAuth();
+  const { currentUser, bills, checkBillStatus } = useAuth();
   
   const userBills = bills.filter((b) => b.user_id === currentUser?.id);
+  const [checkingBillId, setCheckingBillId] = useState<string | null>(null);
+  const [historyToast, setHistoryToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
 
 
@@ -97,8 +99,41 @@ export const UserBillHistory: React.FC = () => {
     return matchesSearch && matchesStatus && matchesDate;
   });
 
+  const handleCheckBillStatus = async (billId: string) => {
+    setCheckingBillId(billId);
+    try {
+      const res = await checkBillStatus(billId);
+      setHistoryToast({
+        message: `Status: ${res.status}! ${res.message || ''}`,
+        type: res.status === 'Success' ? 'success' : 'error',
+      });
+      if (receiptBill && receiptBill.id === billId) {
+        const updated = bills.find(b => b.id === billId);
+        if (updated) setReceiptBill(updated);
+        else setReceiptBill(prev => prev ? { ...prev, status: res.status } : null);
+      }
+    } catch (err: any) {
+      setHistoryToast({ message: err?.message || 'Failed to check status with UsePay.', type: 'error' });
+    } finally {
+      setCheckingBillId(null);
+      setTimeout(() => setHistoryToast(null), 5000);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Toast Notification */}
+      {historyToast && (
+        <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center justify-between animate-fadeIn shadow-xl ${
+          historyToast.type === 'success' 
+            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' 
+            : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+        }`}>
+          <span>{historyToast.message}</span>
+          <button onClick={() => setHistoryToast(null)} className="text-slate-400 hover:text-white ml-2 text-xs">✕</button>
+        </div>
+      )}
+
       {/* Header Panel */}
       <div className="p-6 rounded-2xl glass-card border border-slate-800">
         <div className="flex items-center space-x-2">
@@ -257,7 +292,12 @@ export const UserBillHistory: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 font-mono text-slate-300">{parsed.billerId}</td>
                       <td className="py-3 px-4 font-mono text-slate-300">{parsed.mobile}</td>
-                      <td className="py-3 px-4 font-mono text-indigo-400 font-semibold">{b.transaction_ref}</td>
+                      <td className="py-3 px-4 font-mono text-indigo-400 font-semibold text-xs">
+                        <div>{b.transaction_ref}</div>
+                        {(b.client_transaction_id || parsed.clientTxnId) && (b.client_transaction_id || parsed.clientTxnId) !== b.transaction_ref && (
+                          <div className="text-[10px] text-slate-400 font-normal mt-0.5">Order: {b.client_transaction_id || parsed.clientTxnId}</div>
+                        )}
+                      </td>
                       <td className="py-3 px-4 font-semibold text-slate-200">{b.bank_name}</td>
                       <td className="py-3 px-4 font-mono text-slate-300">{b.card_number}</td>
                       <td className="py-3 px-4 font-bold text-white font-mono">
@@ -272,10 +312,21 @@ export const UserBillHistory: React.FC = () => {
                           </span>
                         )}
                         {b.status === 'Pending' && (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
-                            <Clock className="h-3 w-3" />
-                            <span>Pending</span>
-                          </span>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+                              <Clock className="h-3 w-3" />
+                              <span>Pending</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCheckBillStatus(b.id)}
+                              disabled={checkingBillId === b.id}
+                              title="Check Live Status with UsePay API"
+                              className="p-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-all hover:scale-105 inline-flex items-center"
+                            >
+                              <RefreshCw className={`h-3 w-3 ${checkingBillId === b.id ? 'animate-spin' : ''}`} />
+                            </button>
+                          </div>
                         )}
                         {b.status === 'Failed' && (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
@@ -373,15 +424,33 @@ export const UserBillHistory: React.FC = () => {
                   receiptBill.status === 'Pending' ? 'text-amber-400' : 'text-rose-400'
                 }`}>₹{receiptBill.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between py-1">
+              <div className="flex justify-between py-1 border-b border-slate-800">
                 <span className="text-slate-400">Payment Gateway</span>
                 <span className="text-slate-300">{parsePaymentMethod(receiptBill.payment_method).method}</span>
               </div>
+              {parsePaymentMethod(receiptBill.payment_method).clientTxnId && (
+                <div className="flex justify-between py-1">
+                  <span className="text-slate-400">Client Order ID</span>
+                  <span className="font-mono text-indigo-300 font-semibold text-[11px]">{parsePaymentMethod(receiptBill.payment_method).clientTxnId}</span>
+                </div>
+              )}
             </div>
+
+            {receiptBill.status === 'Pending' && (
+              <button
+                type="button"
+                onClick={() => handleCheckBillStatus(receiptBill.id)}
+                disabled={checkingBillId === receiptBill.id}
+                className="mt-4 w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs transition-colors flex items-center justify-center space-x-2 shadow-lg shadow-amber-600/20"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${checkingBillId === receiptBill.id ? 'animate-spin' : ''}`} />
+                <span>Check Live Status (સ્ટેટસ તપાસો)</span>
+              </button>
+            )}
 
             <button
               onClick={() => setReceiptBill(null)}
-              className="mt-6 w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors shadow-lg shadow-indigo-600/30"
+              className="mt-4 w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors shadow-lg shadow-indigo-600/30"
             >
               Done & Close
             </button>

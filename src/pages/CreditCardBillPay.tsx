@@ -79,13 +79,15 @@ export const parsePaymentMethod = (paymentMethodStr: string) => {
     return {
       method: parts[0] || 'UPI / NetBanking',
       billerId: parts[1] || 'N/A',
-      mobile: parts[2] || 'N/A'
+      mobile: parts[2] || 'N/A',
+      clientTxnId: parts[3] || undefined
     };
   }
   return {
     method: paymentMethodStr || 'UPI / NetBanking',
     billerId: 'N/A',
-    mobile: 'N/A'
+    mobile: 'N/A',
+    clientTxnId: undefined
   };
 };
 
@@ -123,7 +125,9 @@ const getBillerLogoUrl = (billerName: string): string | null => {
 };
 
 export const CreditCardBillPay: React.FC = () => {
-  const { currentUser, bills, payBill, theme } = useAuth();
+  const { currentUser, bills, payBill, checkBillStatus, theme } = useAuth();
+  const [isCheckingModalStatus, setIsCheckingModalStatus] = useState(false);
+  const [modalStatusMsg, setModalStatusMsg] = useState('');
 
   const PRESET_CATEGORIES = [
     "Credit Card",
@@ -1069,6 +1073,27 @@ export const CreditCardBillPay: React.FC = () => {
     setActiveStep(1);
     setSelectedCategory('');
     setCustomerPan('');
+    setModalStatusMsg('');
+  };
+
+  const handleCheckModalStatus = async () => {
+    if (!receiptBill) return;
+    setIsCheckingModalStatus(true);
+    setModalStatusMsg('');
+    try {
+      const res = await checkBillStatus(receiptBill.id);
+      const updated = bills.find(b => b.id === receiptBill.id);
+      if (updated) {
+        setReceiptBill(updated);
+      } else {
+        setReceiptBill(prev => prev ? { ...prev, status: res.status } : null);
+      }
+      setModalStatusMsg(res.message || `Status updated to ${res.status}`);
+    } catch (err: any) {
+      setModalStatusMsg(err.message || 'Status check failed. Please try again.');
+    } finally {
+      setIsCheckingModalStatus(false);
+    }
   };
 
   const handleTpinVerifyAndPay = async (e: React.FormEvent) => {
@@ -1779,15 +1804,51 @@ export const CreditCardBillPay: React.FC = () => {
                   receiptBill.status === 'Pending' ? 'text-amber-400' : 'text-rose-400'
                 }`}>₹{receiptBill.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between py-1">
+              <div className="flex justify-between py-1 border-b border-slate-800">
                 <span className="text-slate-400">Payment Gateway</span>
                 <span className="text-slate-300">{parsePaymentMethod(receiptBill.payment_method).method}</span>
               </div>
+              {parsePaymentMethod(receiptBill.payment_method).clientTxnId && (
+                <div className="flex justify-between py-1">
+                  <span className="text-slate-400">Client Order ID</span>
+                  <span className="font-mono text-indigo-300 font-semibold text-[11px]">{parsePaymentMethod(receiptBill.payment_method).clientTxnId}</span>
+                </div>
+              )}
             </div>
+
+            {/* Live Check Status Action for Pending Bills */}
+            {receiptBill.status === 'Pending' && (
+              <div className="mt-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-2">
+                <p className="text-amber-300 font-medium text-[11px]">
+                  Payment is processing at the biller bank. Click below to verify real-time status:
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCheckModalStatus}
+                  disabled={isCheckingModalStatus}
+                  className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs transition-colors flex items-center justify-center space-x-2 shadow-lg shadow-amber-600/20"
+                >
+                  {isCheckingModalStatus ? (
+                    <>
+                      <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Checking Live Status...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-4 w-4" />
+                      <span>Check Live Status (સ્ટેટસ તપાસો)</span>
+                    </>
+                  )}
+                </button>
+                {modalStatusMsg && (
+                  <p className="text-[11px] text-center text-slate-300 pt-1 font-mono">{modalStatusMsg}</p>
+                )}
+              </div>
+            )}
 
             <button
               onClick={handleCloseReceipt}
-              className="mt-6 w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors shadow-lg shadow-indigo-600/30"
+              className="mt-5 w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors shadow-lg shadow-indigo-600/30"
             >
               Done & Close
             </button>
