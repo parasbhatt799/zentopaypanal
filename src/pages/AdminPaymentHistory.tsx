@@ -567,7 +567,7 @@ export const AdminPaymentHistory: React.FC = () => {
                 <th className="py-3.5 px-4">Paid Amount</th>
                 <th className="py-3.5 px-4">Method</th>
                 <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4 text-right">Receipt</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -575,6 +575,7 @@ export const AdminPaymentHistory: React.FC = () => {
                 const user = getUserInfo(b.user_id);
                 const parsed = parsePaymentMethod(b.payment_method);
                 const ids = extractBillIdentifiers(b);
+                const didNotReachApi = !ids.bbpsRef && !ids.bbpsTxnId && !ids.cc01Ref && !ids.apiTxnId && !b.api_transaction_id && !b.bbps_ref_id;
                 return (
                   <tr key={b.id} className="hover:bg-slate-800/30 transition-colors">
                     {/* User Info Column */}
@@ -693,33 +694,10 @@ export const AdminPaymentHistory: React.FC = () => {
                         </span>
                       )}
                       {b.status === 'Pending' && (
-                        <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
-                            <Clock className="h-3 w-3" />
-                            <span>Pending</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleAdminCheckStatus(b.id)}
-                            disabled={checkingAdminBillId === b.id}
-                            title="Check Live Status with UsePay API"
-                            className="p-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-all hover:scale-105 inline-flex items-center cursor-pointer"
-                          >
-                            <RefreshCw className={`h-3 w-3 ${checkingAdminBillId === b.id ? 'animate-spin' : ''}`} />
-                          </button>
-                          {/* ONLY Show 'Mark as Failed' if transaction never reached UsePay API (No BBPS / Gateway ref) */}
-                          {(!ids.bbpsRef && !ids.bbpsTxnId && !ids.cc01Ref && !ids.apiTxnId && !b.api_transaction_id && !b.bbps_ref_id) && (
-                            <button
-                              type="button"
-                              onClick={() => setBillToMarkFailed(b)}
-                              title="Mark as Failed (Request never reached UsePay API)"
-                              className="px-2 py-0.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-semibold text-[10px] transition-all hover:scale-105 inline-flex items-center space-x-1 cursor-pointer shadow-sm"
-                            >
-                              <XCircle className="h-3 w-3 text-rose-400" />
-                              <span>Mark Failed</span>
-                            </button>
-                          )}
-                        </div>
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+                          <Clock className="h-3 w-3" />
+                          <span>Pending</span>
+                        </span>
                       )}
                       {b.status === 'Failed' && (
                         <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
@@ -729,15 +707,44 @@ export const AdminPaymentHistory: React.FC = () => {
                       )}
                     </td>
 
-                    {/* Receipt Action Column */}
+                    {/* Actions Column */}
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => setReceiptBill(b)}
-                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold text-[11px] inline-flex items-center space-x-1 border border-slate-700 transition-all cursor-pointer"
-                      >
-                        <Receipt className="h-3.5 w-3.5" />
-                        <span>Receipt</span>
-                      </button>
+                      <div className="flex items-center justify-end space-x-1.5 flex-wrap gap-y-1">
+                        {/* Live Status Check Button for Pending Transactions */}
+                        {b.status === 'Pending' && (
+                          <button
+                            type="button"
+                            onClick={() => handleAdminCheckStatus(b.id)}
+                            disabled={checkingAdminBillId === b.id}
+                            title="Check Live Status with UsePay API"
+                            className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all hover:scale-105 inline-flex items-center cursor-pointer"
+                          >
+                            <RefreshCw className={`h-3.5 w-3.5 ${checkingAdminBillId === b.id ? 'animate-spin text-amber-400' : ''}`} />
+                          </button>
+                        )}
+
+                        {/* ONLY Show 'Mark as Failed' if transaction is Pending AND never reached UsePay API */}
+                        {b.status === 'Pending' && didNotReachApi && (
+                          <button
+                            type="button"
+                            onClick={() => setBillToMarkFailed(b)}
+                            title="Mark as Failed (Request never reached UsePay API)"
+                            className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-semibold text-[11px] transition-all hover:scale-105 inline-flex items-center space-x-1 cursor-pointer shadow-sm"
+                          >
+                            <XCircle className="h-3.5 w-3.5 text-rose-400" />
+                            <span>Mark Failed</span>
+                          </button>
+                        )}
+
+                        {/* Receipt Button */}
+                        <button
+                          onClick={() => setReceiptBill(b)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold text-[11px] inline-flex items-center space-x-1 border border-slate-700 transition-all cursor-pointer"
+                        >
+                          <Receipt className="h-3.5 w-3.5" />
+                          <span>Receipt</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
