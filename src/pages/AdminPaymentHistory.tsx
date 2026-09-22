@@ -156,18 +156,72 @@ export const AdminPaymentHistory: React.FC = () => {
     safeCurrentPage * ITEMS_PER_PAGE
   );
 
+  const [isFetchingModalStatus, setIsFetchingModalStatus] = useState(false);
+  const [modalStatusHint, setModalStatusHint] = useState('');
+
+  const handleFetchLiveStatusForModal = async () => {
+    const cleanRef = transactionRef.trim();
+    if (!cleanRef) return;
+    setIsFetchingModalStatus(true);
+    setModalStatusHint('');
+    setModalError('');
+    try {
+      const user = users.find((u) => u.id === selectedUserId);
+      if (!user || !user.x_api_key || !user.x_secret_key) {
+        throw new Error('Selected user does not have API credentials configured in profile.');
+      }
+      const res = await fetch(`/api/v1/b2b/status/${encodeURIComponent(cleanRef)}`, {
+        headers: {
+          'x-api-key': user.x_api_key.trim(),
+          'x-secret-key': user.x_secret_key.trim(),
+        },
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'success' && data.data) {
+        const rawStatus = (data.data.current_status || data.data.bbps_status || data.data.status || '').toLowerCase();
+        if (rawStatus === 'success' || rawStatus === 'completed') {
+          setSelectedStatus('Success');
+        } else if (rawStatus === 'failed' || rawStatus === 'error' || rawStatus === 'rejected') {
+          setSelectedStatus('Failed');
+        } else {
+          setSelectedStatus('Pending');
+        }
+        setModalStatusHint(`Verified from UsePay Gateway: Status is ${rawStatus.toUpperCase()} (BBPS: ${data.data.bbps_status || 'N/A'})`);
+      } else {
+        throw new Error(data.message || 'Reference not found on UsePay.');
+      }
+    } catch (err: any) {
+      setModalError(err.message || 'Could not verify reference with gateway.');
+    } finally {
+      setIsFetchingModalStatus(false);
+    }
+  };
+
   // Handle Sync Recent API Transactions
   const handleSyncTransactions = async () => {
     setIsSyncing(true);
     setSyncToast(null);
     try {
       await refreshData();
-      setSyncToast({ message: 'Live transactions and database records synced successfully!', type: 'success' });
+      const pendingList = bills.filter((b) => b.status === 'Pending');
+      let checkedCount = 0;
+      for (const pb of pendingList) {
+        try {
+          await checkBillStatus(pb.id);
+          checkedCount++;
+        } catch (e) {
+          console.warn('Sync pending bill check notice:', pb.id, e);
+        }
+      }
+      setSyncToast({
+        message: `Synced all records! Verified ${checkedCount} pending transaction(s) with live gateway.`,
+        type: 'success',
+      });
     } catch (err: any) {
       setSyncToast({ message: err?.message || 'Failed to sync with database.', type: 'error' });
     } finally {
       setIsSyncing(false);
-      setTimeout(() => setSyncToast(null), 4000);
+      setTimeout(() => setSyncToast(null), 5000);
     }
   };
 
@@ -716,18 +770,39 @@ export const AdminPaymentHistory: React.FC = () => {
 
                 {/* 3. Transaction / BBPS Reference ID */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-                    <span>BBPS / UsePay Ref ID *</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                      <span>BBPS / UsePay Ref ID *</span>
+                    </label>
+                    {transactionRef.trim() && (
+                      <button
+                        type="button"
+                        onClick={handleFetchLiveStatusForModal}
+                        disabled={isFetchingModalStatus}
+                        className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-2.5 w-2.5 ${isFetchingModalStatus ? 'animate-spin' : ''}`} />
+                        <span>{isFetchingModalStatus ? 'Checking Live API...' : 'Fetch Status from UsePay'}</span>
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
-                    placeholder="e.g. BBPSU6443965946 or CC01RS..."
+                    placeholder="e.g. BBPSU3828168450 or CC01RS..."
                     value={transactionRef}
-                    onChange={(e) => setTransactionRef(e.target.value)}
+                    onChange={(e) => {
+                      setTransactionRef(e.target.value);
+                      setModalStatusHint('');
+                    }}
                     required
                     className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono text-indigo-300 font-bold placeholder-slate-500"
                   />
+                  {modalStatusHint && (
+                    <p className="text-[11px] mt-1 text-emerald-400 font-medium animate-in fade-in duration-200">
+                      {modalStatusHint}
+                    </p>
+                  )}
                 </div>
 
                 {/* 4. Paid Amount */}

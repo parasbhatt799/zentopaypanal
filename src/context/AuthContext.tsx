@@ -931,7 +931,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (isSupabaseConfigured && supabase) {
         try {
-          await supabase.from('credit_card_bills').insert({
+          const { error } = await supabase.from('credit_card_bills').upsert({
             user_id: pendingBill.user_id,
             card_number: pendingBill.card_number,
             cardholder_name: pendingBill.cardholder_name,
@@ -940,7 +940,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             status: pendingBill.status,
             transaction_ref: pendingBill.transaction_ref,
             payment_method: pendingBill.payment_method,
-          });
+            created_at: pendingBill.created_at,
+          }, { onConflict: 'transaction_ref' });
+          if (error) {
+            console.error("Supabase upsert error for pending bill:", error);
+          }
         } catch (dbErr) {
           console.error("Failed to insert pending bill to Supabase:", dbErr);
         }
@@ -978,7 +982,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (isSupabaseConfigured && supabase) {
         try {
-          await supabase.from('credit_card_bills').insert({
+          const { error } = await supabase.from('credit_card_bills').upsert({
             user_id: pendingBill.user_id,
             card_number: pendingBill.card_number,
             cardholder_name: pendingBill.cardholder_name,
@@ -987,7 +991,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             status: pendingBill.status,
             transaction_ref: pendingBill.transaction_ref,
             payment_method: pendingBill.payment_method,
-          });
+            created_at: pendingBill.created_at,
+          }, { onConflict: 'transaction_ref' });
+          if (error) {
+            console.error("Supabase upsert error for pending bill:", error);
+          }
         } catch (dbErr) {
           console.error("Failed to insert pending bill to Supabase:", dbErr);
         }
@@ -1019,7 +1027,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isSupabaseConfigured && supabase) {
       try {
-        await supabase.from('credit_card_bills').insert({
+        const { error } = await supabase.from('credit_card_bills').upsert({
           user_id: newBill.user_id,
           card_number: newBill.card_number,
           cardholder_name: newBill.cardholder_name,
@@ -1028,7 +1036,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           status: newBill.status,
           transaction_ref: newBill.transaction_ref,
           payment_method: newBill.payment_method,
-        });
+          created_at: newBill.created_at,
+        }, { onConflict: 'transaction_ref' });
+        if (error) {
+          console.error("Supabase upsert error for new bill:", error);
+        }
       } catch (dbErr) {
         console.error("Failed to insert new bill to Supabase:", dbErr);
       }
