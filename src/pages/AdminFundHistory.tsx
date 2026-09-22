@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { DollarSign, CheckCircle2, Clock, XCircle, FileText, ExternalLink, Search } from 'lucide-react';
+import { DollarSign, CheckCircle2, Clock, XCircle, FileText, ExternalLink, Search, RefreshCw } from 'lucide-react';
 import { Pagination } from '../components/Pagination';
 
 export const AdminFundHistory: React.FC = () => {
-  const { fundRequests, users } = useAuth();
+  const { fundRequests, users, checkFundRequestStatus } = useAuth();
+  const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
+
+  const handleCheckStatus = async (requestId: string) => {
+    setCheckingStatusId(requestId);
+    try {
+      await checkFundRequestStatus(requestId);
+    } catch (err) {
+      console.warn('Failed to verify status:', err);
+    } finally {
+      setCheckingStatusId(null);
+    }
+  };
   
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -269,24 +281,38 @@ export const AdminFundHistory: React.FC = () => {
 
                     {/* Status Column */}
                     <td className="py-3.5 px-4">
-                      {r.status === 'approved' && (
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          <CheckCircle2 className="h-3 w-3" />
-                          <span>Approved</span>
-                        </span>
-                      )}
-                      {r.status === 'pending' && (
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
-                          <Clock className="h-3 w-3" />
-                          <span>Pending</span>
-                        </span>
-                      )}
-                      {r.status === 'rejected' && (
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                          <XCircle className="h-3 w-3" />
-                          <span>Rejected</span>
-                        </span>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        {r.status === 'approved' && (
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>Approved</span>
+                          </span>
+                        )}
+                        {r.status === 'pending' && (
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+                            <Clock className="h-3 w-3" />
+                            <span>Pending</span>
+                          </span>
+                        )}
+                        {r.status === 'rejected' && (
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                            <XCircle className="h-3 w-3" />
+                            <span>Rejected</span>
+                          </span>
+                        )}
+                        <button
+                          onClick={() => handleCheckStatus(r.id)}
+                          disabled={checkingStatusId === r.id}
+                          title="Check / Sync live status with UsePay"
+                          className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <RefreshCw
+                            className={`h-3 w-3 ${
+                              checkingStatusId === r.id ? 'animate-spin text-indigo-400' : ''
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

@@ -5,7 +5,7 @@ import { Send, History, CheckCircle2, AlertCircle, RefreshCw, Upload, Eye, Image
 import { Pagination } from '../components/Pagination';
 
 export const UserFundRequest: React.FC = () => {
-  const { currentUser, fundRequests, submitFundRequest, refreshData } = useAuth();
+  const { currentUser, fundRequests, submitFundRequest, refreshData, checkFundRequestStatus } = useAuth();
 
   // Form states
   const [amount, setAmount] = useState<string>('');
@@ -23,6 +23,21 @@ export const UserFundRequest: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [copiedUtr, setCopiedUtr] = useState<string>('');
   const [isFetchingBanks, setIsFetchingBanks] = useState<boolean>(false);
+  const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
+
+  const handleCheckStatus = async (requestId: string) => {
+    setCheckingStatusId(requestId);
+    try {
+      const res = await checkFundRequestStatus(requestId);
+      setSuccessMsg(`Status updated: ${res.status.toUpperCase()}`);
+      setTimeout(() => setSuccessMsg(''), 3500);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to check status');
+      setTimeout(() => setErrorMsg(''), 4000);
+    } finally {
+      setCheckingStatusId(null);
+    }
+  };
   const [apiBalance, setApiBalance] = useState<number | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -894,17 +909,31 @@ export const UserFundRequest: React.FC = () => {
                           )}
                         </td>
                         <td className="py-4 px-2">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                              req.status === 'approved'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                : req.status === 'rejected'
-                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                            }`}
-                          >
-                            {req.status.toUpperCase()}
-                          </span>
+                          <div className="flex items-center space-x-1.5">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                req.status === 'approved'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : req.status === 'rejected'
+                                  ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                              }`}
+                            >
+                              {req.status.toUpperCase()}
+                            </span>
+                            <button
+                              onClick={() => handleCheckStatus(req.id)}
+                              disabled={checkingStatusId === req.id}
+                              title="Check / Sync live status with UsePay"
+                              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              <RefreshCw
+                                className={`h-3 w-3 ${
+                                  checkingStatusId === req.id ? 'animate-spin text-emerald-400' : ''
+                                }`}
+                              />
+                            </button>
+                          </div>
                         </td>
                         <td className="py-4 px-2">
                           {req.proof_url ? (

@@ -106,6 +106,7 @@ interface AuthContextType {
   }) => Promise<CreditCardBill>;
   refreshData: () => Promise<void>;
   checkBillStatus: (billId: string, customId?: string) => Promise<{ success: boolean; status: TransactionStatus; message: string; data?: any }>;
+  checkFundRequestStatus: (requestId: string) => Promise<{ success: boolean; status: 'pending' | 'approved' | 'rejected'; message: string }>;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
   fundRequests: FundRequest[];
@@ -1158,7 +1159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (isSupabaseConfigured && supabase) {
         try {
-          await supabase.from('fund_requests').insert({
+          const { error } = await supabase.from('fund_requests').upsert({
             id: newRequest.id,
             user_id: newRequest.user_id,
             amount: newRequest.amount,
@@ -1168,7 +1169,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             status: newRequest.status,
             created_at: newRequest.created_at,
             updated_at: newRequest.updated_at,
-          });
+          }, { onConflict: 'id' });
+          if (error) {
+            console.error('Failed to insert fund request to database:', error);
+          }
         } catch (dbErr) {
           console.warn('Failed to insert fund request to database:', dbErr);
         }
@@ -1180,6 +1184,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error(err.message || 'Connection timeout with UsePay API.');
     }
   };
+
+  const lastFundRequestCheckRef = useRef<Record<string, number>>({});
 
   const checkPendingFundRequests = async (
     activeUserId: string,
@@ -1194,14 +1200,84 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const currentUserProfile = usersToUse.find(u => u.id === activeUserId);
     const isAdmin = currentUserProfile?.role === 'admin';
 
-    // If admin, check all pending requests. If user, check only their own.
-    const pending = requestsToUse.filter(r =>
-      isAdmin ? r.status === 'pending' : (r.user_id === activeUserId && r.status === 'pending')
-    );
+    // Auto-recover any missed/skipped entries directly from UsePay Gateway list API
+    if (!isAdmin && apiKey && secretKey) {
+      try {
+        const listResponse = await fetch('/api/v1/b2b/fund-requests?page=1&limit=50', {
+          headers: {
+            'x-api-key': apiKey,
+            'x-secret-key': secretKey
+          }
+        });
+        if (listResponse.ok) {
+          const listData = await listResponse.json();
+          if (listData.status === 'success' && Array.isArray(listData.data)) {
+            const missingEntries: FundRequest[] = [];
+            for (const item of listData.data) {
+              let rawStatus = item.status?.toString().toLowerCase().trim();
+              let normStatus: 'pending' | 'approved' | 'rejected' = 'pending';
+              if (rawStatus === 'reject' || rawStatus === 'rejected' || rawStatus === 'failed') {
+                normStatus = 'rejected';
+              } else if (rawStatus === 'approve' || rawStatus === 'approved' || rawStatus === 'success') {
+                normStatus = 'approved';
+              }
 
-    if (pending.length === 0) return;
+              const exists = fundRequestsRef.current.some(
+                r => r.id === item.request_id || (r.utr_number && item.utr_number && r.utr_number.toLowerCase() === item.utr_number.toLowerCase())
+              );
 
-    for (const req of pending) {
+              if (!exists) {
+                missingEntries.push({
+                  id: item.request_id,
+                  user_id: activeUserId,
+                  amount: parseFloat(item.amount.toString()),
+                  utr_number: item.utr_number,
+                  admin_bank_account_id: item.admin_bank_account_id || null,
+                  proof_url: item.proof_url || null,
+                  status: normStatus,
+                  created_at: item.created_at || new Date().toISOString(),
+                  updated_at: item.created_at || new Date().toISOString()
+                });
+              }
+            }
+
+            if (missingEntries.length > 0) {
+              console.log(`>>> [Gateway Fund Sync] Recovered ${missingEntries.length} skipped entry/entries from UsePay!`, missingEntries);
+              setFundRequests(prev => [...missingEntries, ...prev]);
+              if (isSupabaseConfigured && supabase) {
+                await supabase.from('fund_requests').upsert(missingEntries, { onConflict: 'id' });
+              }
+            }
+          }
+        }
+      } catch (listErr) {
+        console.warn('[Gateway Fund Sync] Notice:', listErr);
+      }
+    }
+
+    const now = Date.now();
+    const RECENT_MONITOR_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days window to catch reversals / rejections
+    const COMPLETED_CHECK_INTERVAL_MS = 3 * 60 * 1000; // Throttle already completed requests to check at most once every 3 minutes
+
+    // 1. Check all pending requests
+    // 2. Also check recent (last 7 days) approved/rejected requests if due, to catch any gateway reversals/rejections
+    const candidates = requestsToUse.filter((r) => {
+      const isOwnerOrAdmin = isAdmin ? true : r.user_id === activeUserId;
+      if (!isOwnerOrAdmin) return false;
+
+      if (r.status === 'pending') return true;
+
+      const reqDate = new Date(r.updated_at || r.created_at).getTime();
+      const isRecent = !isNaN(reqDate) && (now - reqDate) < RECENT_MONITOR_WINDOW_MS;
+      if (!isRecent) return false;
+
+      const lastCheck = lastFundRequestCheckRef.current[r.id] || 0;
+      return (now - lastCheck) >= COMPLETED_CHECK_INTERVAL_MS;
+    });
+
+    if (candidates.length === 0) return;
+
+    for (const req of candidates) {
       try {
         let reqApiKey = apiKey;
         let reqSecretKey = secretKey;
@@ -1217,7 +1293,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           reqSecretKey = owner.x_secret_key.trim();
         }
 
-        const response = await fetch(`/api/v1/b2b/fund-request/status/${req.id}`, {
+        lastFundRequestCheckRef.current[req.id] = now;
+
+        const response = await fetch(`/api/v1/b2b/fund-request/status/${encodeURIComponent(req.id)}`, {
           method: 'GET',
           headers: {
             'x-api-key': reqApiKey,
@@ -1227,12 +1305,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (response.ok) {
           const resData = await response.json();
           if (resData.status === 'success' && resData.data) {
-            const newStatus = resData.data.status;
-            if (newStatus !== 'pending') {
+            let rawStatus = resData.data.status?.toString().toLowerCase().trim();
+            let newStatus: 'pending' | 'approved' | 'rejected' = 'pending';
+            if (rawStatus === 'reject' || rawStatus === 'rejected' || rawStatus === 'failed') {
+              newStatus = 'rejected';
+            } else if (rawStatus === 'approve' || rawStatus === 'approved' || rawStatus === 'success') {
+              newStatus = 'approved';
+            }
+
+            // Update if status changed (handles pending->approved/rejected AND approved->rejected upon revert)
+            if (newStatus !== req.status) {
+              console.log(
+                `>>> [Fund Request Auto-Sync] Request ${req.id} (UTR: ${req.utr_number}) status updated from '${req.status}' to '${newStatus}'`
+              );
+
+              const updatedTimestamp = resData.data.updated_at || new Date().toISOString();
+
               setFundRequests((prev) =>
                 prev.map((r) =>
                   r.id === req.id
-                    ? { ...r, status: newStatus, updated_at: resData.data.updated_at || new Date().toISOString() }
+                    ? { ...r, status: newStatus, updated_at: updatedTimestamp }
                     : r
                 )
               );
@@ -1242,7 +1334,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   .from('fund_requests')
                   .update({
                     status: newStatus,
-                    updated_at: resData.data.updated_at || new Date().toISOString(),
+                    updated_at: updatedTimestamp,
                   })
                   .eq('id', req.id)
                   .then(({ error }) => {
@@ -1258,6 +1350,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn(`Failed to check status for request ${req.id}:`, err);
       }
     }
+  };
+
+  const checkFundRequestStatus = async (
+    requestId: string
+  ): Promise<{ success: boolean; status: 'pending' | 'approved' | 'rejected'; message: string }> => {
+    const req = fundRequestsRef.current.find((r) => r.id === requestId) || fundRequests.find((r) => r.id === requestId);
+    if (!req) {
+      throw new Error('Fund request record not found.');
+    }
+
+    const owner = usersRef.current.find((u) => u.id === req.user_id) || currentUser;
+    if (!owner || !owner.x_api_key || !owner.x_secret_key) {
+      throw new Error('API credentials (x-api-key, x-secret-key) missing for fund request verification.');
+    }
+
+    const response = await fetch(`/api/v1/b2b/fund-request/status/${encodeURIComponent(req.id)}`, {
+      method: 'GET',
+      headers: {
+        'x-api-key': owner.x_api_key.trim(),
+        'x-secret-key': owner.x_secret_key.trim(),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gateway returned HTTP ${response.status}`);
+    }
+
+    const resData = await response.json();
+    if (resData.status !== 'success' || !resData.data) {
+      throw new Error(resData.message || 'Failed to fetch status from UsePay API.');
+    }
+
+    let rawStatus = resData.data.status?.toString().toLowerCase().trim();
+    let normalizedStatus: 'pending' | 'approved' | 'rejected' = 'pending';
+    if (rawStatus === 'reject' || rawStatus === 'rejected' || rawStatus === 'failed') {
+      normalizedStatus = 'rejected';
+    } else if (rawStatus === 'approve' || rawStatus === 'approved' || rawStatus === 'success') {
+      normalizedStatus = 'approved';
+    }
+
+    const updatedTimestamp = resData.data.updated_at || new Date().toISOString();
+
+    setFundRequests((prev) =>
+      prev.map((r) => (r.id === req.id ? { ...r, status: normalizedStatus, updated_at: updatedTimestamp } : r))
+    );
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('fund_requests')
+          .update({
+            status: normalizedStatus,
+            updated_at: updatedTimestamp,
+          })
+          .eq('id', req.id);
+      } catch (dbErr) {
+        console.warn('Failed to update fund request in Supabase:', dbErr);
+      }
+    }
+
+    lastFundRequestCheckRef.current[req.id] = Date.now();
+
+    return {
+      success: true,
+      status: normalizedStatus,
+      message: `Fund request status is ${normalizedStatus.toUpperCase()}`,
+    };
   };
 
   // Background Status Check Cron Job for Pending Transactions
@@ -1529,6 +1688,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addManualBill,
         refreshData,
         checkBillStatus,
+        checkFundRequestStatus,
         theme,
         toggleTheme,
         fundRequests,
