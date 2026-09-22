@@ -145,8 +145,8 @@ const AppContent: React.FC = () => {
           onToggleDesktopMode={() => setForceDesktopMode(!forceDesktopMode)}
         />
 
-        <main className="flex-1 px-4 sm:px-16 lg:px-24 py-8 overflow-y-auto">
-          <div className="max-w-[1600px] mx-auto w-full">
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
+          <div className="w-full">
             {role === 'admin' && (
               <>
                 {currentTab === 'admin-dashboard' && <AdminDashboard />}
