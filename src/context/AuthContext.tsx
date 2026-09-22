@@ -1464,14 +1464,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('User API credentials (x-api-key, x-secret-key) not configured in profile.');
     }
 
-    // Extract BBPS Ref (BBPSU...), Order ID (TXN_ORD_...), and API Txn ID
-    const { orderId, bbpsRef, apiTxnId } = extractBillIdentifiers(bill);
+    // Extract all 4 UsePay identifiers (TXN_ORD_..., BBPSU..., CC01..., and API Txn ID)
+    const { orderId, bbpsTxnId, cc01Ref, bbpsRef, apiTxnId } = extractBillIdentifiers(bill);
 
-    // Build ordered list of candidate query IDs: Query BOTH BBPS Reference and Custom Order ID!
+    // Build ordered list of candidate query IDs: Recommended Custom Order ID first, followed by BBPSU & CC01
     const candidates: string[] = [];
     if (customId && customId.trim()) candidates.push(customId.trim());
-    if (bbpsRef && !candidates.includes(bbpsRef)) candidates.push(bbpsRef);
     if (orderId && !candidates.includes(orderId)) candidates.push(orderId);
+    if (bbpsTxnId && !candidates.includes(bbpsTxnId)) candidates.push(bbpsTxnId);
+    if (cc01Ref && !candidates.includes(cc01Ref)) candidates.push(cc01Ref);
+    if (bbpsRef && !candidates.includes(bbpsRef)) candidates.push(bbpsRef);
     if (apiTxnId && !candidates.includes(apiTxnId)) candidates.push(apiTxnId);
     const refToken = bill.transaction_ref ? bill.transaction_ref.split(' ')[0] : '';
     if (refToken && !candidates.includes(refToken)) candidates.push(refToken);
