@@ -673,8 +673,10 @@ export const AdminPaymentHistory: React.FC = () => {
                     {/* Bank Name Column */}
                     <td className="py-3.5 px-4 font-semibold text-slate-200">{b.bank_name}</td>
 
-                    {/* Card Number Column */}
-                    <td className="py-3.5 px-4 font-mono text-slate-300">{b.card_number}</td>
+                    {/* Card Number Column (Last 4 Digits Only) */}
+                    <td className="py-3.5 px-4 font-mono text-slate-300 font-semibold tracking-wider">
+                      {b.card_number ? (b.card_number.replace(/\D/g, '').slice(-4) || b.card_number.replace(/[*•\s]/g, '') || b.card_number) : '-'}
+                    </td>
 
                     {/* Amount Column */}
                     <td className="py-3.5 px-4 font-bold text-white font-mono">

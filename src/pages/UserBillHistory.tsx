@@ -384,7 +384,9 @@ export const UserBillHistory: React.FC = () => {
                         </div>
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-200">{b.bank_name}</td>
-                      <td className="py-3 px-4 font-mono text-slate-300">{b.card_number}</td>
+                      <td className="py-3 px-4 font-mono text-slate-300 font-semibold tracking-wider">
+                        {b.card_number ? (b.card_number.replace(/\D/g, '').slice(-4) || b.card_number.replace(/[*•\s]/g, '') || b.card_number) : '-'}
+                      </td>
                       <td className="py-3 px-4 font-bold text-white font-mono">
                         ₹{b.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
