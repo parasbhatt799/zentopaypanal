@@ -9,6 +9,7 @@ import {
   saveBills,
   getStoredMaintenance,
   saveMaintenance,
+  fetchAllSupabaseRows,
 } from '../lib/supabase';
 
 const MOCK_B2B_CONFIG_KEY = 'zentopay_b2b_config';
@@ -243,10 +244,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      const { data: billsData } = await supabase
-        .from('credit_card_bills')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const billsData = await fetchAllSupabaseRows<CreditCardBill>('credit_card_bills', 'created_at', false);
       if (billsData && billsData.length > 0) {
         setBills(billsData);
       }
@@ -269,10 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setB2BConfig(b2bSettings.value as B2BConfig);
       }
 
-      const { data: fundRequestsData } = await supabase
-        .from('fund_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const fundRequestsData = await fetchAllSupabaseRows<FundRequest>('fund_requests', 'created_at', false);
       if (fundRequestsData && fundRequestsData.length > 0) {
         setFundRequests(fundRequestsData);
       }

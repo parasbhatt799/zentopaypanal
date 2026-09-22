@@ -48,7 +48,11 @@ export const getStoredUsers = (): UserProfile[] => {
 };
 
 export const saveUsers = (users: UserProfile[]) => {
-  localStorage.setItem(MOCK_USERS_KEY, JSON.stringify(users));
+  try {
+    localStorage.setItem(MOCK_USERS_KEY, JSON.stringify(users));
+  } catch (e) {
+    console.warn('Could not save all users to localStorage quota:', e);
+  }
 };
 
 export const getStoredBills = (): CreditCardBill[] => {
@@ -65,7 +69,74 @@ export const getStoredBills = (): CreditCardBill[] => {
 };
 
 export const saveBills = (bills: CreditCardBill[]) => {
-  localStorage.setItem(MOCK_BILLS_KEY, JSON.stringify(bills));
+  try {
+    localStorage.setItem(MOCK_BILLS_KEY, JSON.stringify(bills));
+  } catch (e) {
+    console.warn('Could not save all bills to localStorage quota:', e);
+  }
+};
+
+/**
+ * Helper to fetch all rows from a Supabase table by chunking in batches of 1000
+ * to overcome Supabase PostgREST default max-rows limit (1,000 rows).
+ */
+export const fetchAllSupabaseRows = async <T = any>(
+  tableName: string,
+  orderBy: string = 'created_at',
+  ascending: boolean = false
+): Promise<T[]> => {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  let allRows: T[] = [];
+  let from = 0;
+  const batchSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .order(orderBy, { ascending })
+        .range(from, from + batchSize - 1);
+
+      if (error) {
+        console.error(`Error fetching batch from ${tableName} (range ${from}-${from + batchSize - 1}):`, error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allRows = allRows.concat(data as T[]);
+        if (data.length < batchSize) {
+          hasMore = false;
+        } else {
+          from += batchSize;
+        }
+      } else {
+        hasMore = false;
+      }
+    } catch (err) {
+      console.error(`Exception while fetching batch from ${tableName}:`, err);
+      break;
+    }
+  }
+
+  // Deduplicate by id if present to guarantee unique records across range boundaries
+  const seenIds = new Set<string>();
+  const uniqueRows: T[] = [];
+  for (const row of allRows) {
+    const id = (row as any)?.id;
+    if (id) {
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        uniqueRows.push(row);
+      }
+    } else {
+      uniqueRows.push(row);
+    }
+  }
+
+  return uniqueRows;
 };
 
 export const getStoredMaintenance = (): MaintenanceConfig => {
