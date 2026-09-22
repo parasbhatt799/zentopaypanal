@@ -108,6 +108,7 @@ interface AuthContextType {
   refreshData: () => Promise<void>;
   checkBillStatus: (billId: string, customId?: string) => Promise<{ success: boolean; status: TransactionStatus; message: string; data?: any }>;
   checkFundRequestStatus: (requestId: string) => Promise<{ success: boolean; status: 'pending' | 'approved' | 'rejected'; message: string }>;
+  updateBillStatus: (billId: string, status: TransactionStatus) => Promise<void>;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
   fundRequests: FundRequest[];
@@ -1598,6 +1599,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
+  const updateBillStatus = async (billId: string, status: TransactionStatus) => {
+    setBills((prev) =>
+      prev.map((b) => (b.id === billId ? { ...b, status } : b))
+    );
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const targetBill = billsRef.current.find((b) => b.id === billId) || bills.find((b) => b.id === billId);
+        if (targetBill) {
+          const { error } = await supabase
+            .from('credit_card_bills')
+            .update({ status })
+            .or(`id.eq.${billId},transaction_ref.eq.${targetBill.transaction_ref}`);
+          if (error) {
+            console.error("Supabase error updating bill status:", error);
+          }
+        }
+      } catch (dbErr) {
+        console.error("Failed to update bill status in Supabase:", dbErr);
+      }
+    }
+  };
+
   const checkPendingStatus = async () => {
     const pendingBills = billsRef.current.filter((b) => b.status === 'Pending');
     if (pendingBills.length === 0) return;
@@ -1709,6 +1733,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshData,
         checkBillStatus,
         checkFundRequestStatus,
+        updateBillStatus,
         theme,
         toggleTheme,
         fundRequests,

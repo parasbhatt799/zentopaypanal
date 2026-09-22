@@ -26,7 +26,7 @@ const PRESET_BILLERS = [
 ];
 
 export const AdminPaymentHistory: React.FC = () => {
-  const { bills, users, refreshData, addManualBill, checkBillStatus } = useAuth();
+  const { bills, users, refreshData, addManualBill, checkBillStatus, updateBillStatus } = useAuth();
   const [receiptBill, setReceiptBill] = useState<any | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -40,6 +40,10 @@ export const AdminPaymentHistory: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncToast, setSyncToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [checkingAdminBillId, setCheckingAdminBillId] = useState<string | null>(null);
+
+  // Mark As Failed Modal State (Only for entries that never reached API)
+  const [billToMarkFailed, setBillToMarkFailed] = useState<any | null>(null);
+  const [isMarkingFailed, setIsMarkingFailed] = useState(false);
 
   // Add Missing Transaction Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -250,6 +254,28 @@ export const AdminPaymentHistory: React.FC = () => {
       setSyncToast({ message: err?.message || 'Failed to check status with UsePay API.', type: 'error' });
     } finally {
       setCheckingAdminBillId(null);
+      setTimeout(() => setSyncToast(null), 5000);
+    }
+  };
+
+  // Handle Mark As Failed (for transactions that never reached UsePay API)
+  const handleConfirmMarkFailed = async () => {
+    if (!billToMarkFailed) return;
+    setIsMarkingFailed(true);
+    try {
+      await updateBillStatus(billToMarkFailed.id, 'Failed');
+      setSyncToast({
+        message: `Transaction ${billToMarkFailed.transaction_ref || ''} marked as Failed successfully.`,
+        type: 'success',
+      });
+      setBillToMarkFailed(null);
+    } catch (err: any) {
+      setSyncToast({
+        message: err?.message || 'Failed to update transaction status.',
+        type: 'error',
+      });
+    } finally {
+      setIsMarkingFailed(false);
       setTimeout(() => setSyncToast(null), 5000);
     }
   };
@@ -667,7 +693,7 @@ export const AdminPaymentHistory: React.FC = () => {
                         </span>
                       )}
                       {b.status === 'Pending' && (
-                        <div className="flex items-center space-x-1.5">
+                        <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
                           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
                             <Clock className="h-3 w-3" />
                             <span>Pending</span>
@@ -681,6 +707,18 @@ export const AdminPaymentHistory: React.FC = () => {
                           >
                             <RefreshCw className={`h-3 w-3 ${checkingAdminBillId === b.id ? 'animate-spin' : ''}`} />
                           </button>
+                          {/* ONLY Show 'Mark as Failed' if transaction never reached UsePay API (No BBPS / Gateway ref) */}
+                          {(!ids.bbpsRef && !ids.bbpsTxnId && !ids.cc01Ref && !ids.apiTxnId && !b.api_transaction_id && !b.bbps_ref_id) && (
+                            <button
+                              type="button"
+                              onClick={() => setBillToMarkFailed(b)}
+                              title="Mark as Failed (Request never reached UsePay API)"
+                              className="px-2 py-0.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-semibold text-[10px] transition-all hover:scale-105 inline-flex items-center space-x-1 cursor-pointer shadow-sm"
+                            >
+                              <XCircle className="h-3 w-3 text-rose-400" />
+                              <span>Mark Failed</span>
+                            </button>
+                          )}
                         </div>
                       )}
                       {b.status === 'Failed' && (
@@ -1141,6 +1179,85 @@ export const AdminPaymentHistory: React.FC = () => {
             >
               Done & Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mark As Failed Confirmation Modal */}
+      {billToMarkFailed && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl relative animate-scale-up">
+            <button
+              onClick={() => setBillToMarkFailed(null)}
+              disabled={isMarkingFailed}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white tracking-tight">Mark as Failed?</h3>
+                <p className="text-xs text-slate-400">Unreached / Incomplete Pending Transaction</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-2.5 text-xs mb-5">
+              <div className="flex justify-between items-center py-1 border-b border-slate-800/50">
+                <span className="text-slate-400">Order ID:</span>
+                <span className="font-mono text-violet-300 font-bold">{billToMarkFailed.transaction_ref}</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-slate-800/50">
+                <span className="text-slate-400">Card Member:</span>
+                <span className="font-semibold text-slate-200">{getUserInfo(billToMarkFailed.user_id).name}</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-slate-800/50">
+                <span className="text-slate-400">Bank & Card:</span>
+                <span className="font-mono text-slate-200">{billToMarkFailed.bank_name} ({billToMarkFailed.card_number})</span>
+              </div>
+              <div className="flex justify-between items-center py-1">
+                <span className="text-slate-400">Amount:</span>
+                <span className="font-bold text-rose-400 font-mono text-sm">
+                  ₹{billToMarkFailed.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl mb-5 text-[11px] text-rose-300 leading-relaxed">
+              <strong>Notice:</strong> This transaction never reached the UsePay API gateway (no BBPS or API reference exists). Marking it as Failed will safely update the status to <strong>Failed</strong> in the database.
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setBillToMarkFailed(null)}
+                disabled={isMarkingFailed}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmMarkFailed}
+                disabled={isMarkingFailed}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs transition-all shadow-lg shadow-rose-600/20 inline-flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                {isMarkingFailed ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span>Updating...</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-3.5 w-3.5" />
+                    <span>Confirm Failed</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
