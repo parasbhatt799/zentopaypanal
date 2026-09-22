@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { DollarSign, CheckCircle2, Clock, XCircle, FileText, ExternalLink, Search } from 'lucide-react';
+import { Pagination } from '../components/Pagination';
 
 export const AdminFundHistory: React.FC = () => {
   const { fundRequests, users } = useAuth();
@@ -81,6 +82,21 @@ export const AdminFundHistory: React.FC = () => {
 
     return matchesSearch && matchesStatus && matchesDate;
   });
+
+  // Pagination (10 per page)
+  const ITEMS_PER_PAGE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, dateFilter, startDate, endDate]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedRequests = filteredRequests.slice(
+    (safeCurrentPage - 1) * ITEMS_PER_PAGE,
+    safeCurrentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <div className="space-y-6">
@@ -193,7 +209,7 @@ export const AdminFundHistory: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {filteredRequests.map((r) => {
+              {paginatedRequests.map((r) => {
                 const user = getUserInfo(r.user_id);
                 return (
                   <tr key={r.id} className="hover:bg-slate-800/30 transition-colors">
@@ -285,6 +301,16 @@ export const AdminFundHistory: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        <Pagination
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          totalItems={filteredRequests.length}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setCurrentPage}
+          itemName="fund requests"
+        />
       </div>
     </div>
   );

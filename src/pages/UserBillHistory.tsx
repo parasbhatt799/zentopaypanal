@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import type { CreditCardBill } from '../types';
 import { parsePaymentMethod } from './CreditCardBillPay';
@@ -6,6 +6,7 @@ import {
   Receipt, Search, Clock, CheckCircle2, XCircle, 
   History, Calendar, Filter, FileText, ChevronRight, X, RefreshCw 
 } from 'lucide-react';
+import { Pagination } from '../components/Pagination';
 
 export const UserBillHistory: React.FC = () => {
   const { currentUser, bills, checkBillStatus } = useAuth();
@@ -98,6 +99,21 @@ export const UserBillHistory: React.FC = () => {
 
     return matchesSearch && matchesStatus && matchesDate;
   });
+
+  // Pagination (10 per page)
+  const ITEMS_PER_PAGE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, dateFilter, startDate, endDate]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUserBills.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedUserBills = filteredUserBills.slice(
+    (safeCurrentPage - 1) * ITEMS_PER_PAGE,
+    safeCurrentPage * ITEMS_PER_PAGE
+  );
 
   const handleCheckBillStatus = async (billId: string) => {
     setCheckingBillId(billId);
@@ -276,7 +292,7 @@ export const UserBillHistory: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {filteredUserBills.map((b) => {
+                {paginatedUserBills.map((b) => {
                   const parsed = parsePaymentMethod(b.payment_method);
                   return (
                     <tr key={b.id} className="hover:bg-slate-800/30 transition-colors">
@@ -351,6 +367,16 @@ export const UserBillHistory: React.FC = () => {
             </table>
           )}
         </div>
+
+        {/* Pagination */}
+        <Pagination
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          totalItems={filteredUserBills.length}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setCurrentPage}
+          itemName="bills"
+        />
       </div>
 
       {/* Payment Receipt Modal */}

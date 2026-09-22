@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import type { UserProfile, UserRole } from '../types';
 import { Search, UserCheck, UserX, Shield, User, Filter, Check, Ban, UserPlus, Copy, X, Key, Phone, Mail, Sparkles, CheckCircle2, Network, Lock, Edit, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
+import { Pagination } from '../components/Pagination';
 
 const UserApiBalance: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [balance, setBalance] = useState<number | null>(null);
@@ -224,6 +225,21 @@ export const UserList: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Pagination (10 per page)
+  const ITEMS_PER_PAGE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedUsers = filteredUsers.slice(
+    (safeCurrentPage - 1) * ITEMS_PER_PAGE,
+    safeCurrentPage * ITEMS_PER_PAGE
+  );
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firstName || !lastName || !phone) return;
@@ -368,7 +384,7 @@ export const UserList: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {filteredUsers.map((u) => (
+              {paginatedUsers.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="py-3.5 px-4">
                     <div className="flex items-center space-x-3">
@@ -469,9 +485,26 @@ export const UserList: React.FC = () => {
                   </td>
                 </tr>
               ))}
+              {filteredUsers.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-500 font-medium">
+                    No matching users found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        <Pagination
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          totalItems={filteredUsers.length}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setCurrentPage}
+          itemName="users"
+        />
       </div>
 
       {/* MODAL 1: Create New User Form */}

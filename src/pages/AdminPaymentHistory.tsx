@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   CreditCard, CheckCircle2, Clock, XCircle, Receipt, Search, 
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { parsePaymentMethod } from './CreditCardBillPay';
 import type { TransactionStatus } from '../types';
+import { Pagination } from '../components/Pagination';
 
 const PRESET_BILLERS = [
   { id: 'SBIC00000NATDN', name: 'SBI Card' },
@@ -139,6 +140,21 @@ export const AdminPaymentHistory: React.FC = () => {
 
     return matchesSearch && matchesStatus && matchesDate;
   });
+
+  // Pagination (10 per page)
+  const ITEMS_PER_PAGE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, dateFilter, startDate, endDate]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredBills.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedBills = filteredBills.slice(
+    (safeCurrentPage - 1) * ITEMS_PER_PAGE,
+    safeCurrentPage * ITEMS_PER_PAGE
+  );
 
   // Handle Sync Recent API Transactions
   const handleSyncTransactions = async () => {
@@ -463,9 +479,9 @@ export const AdminPaymentHistory: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {filteredBills.map((b) => {
-                const parsed = parsePaymentMethod(b.payment_method);
+              {paginatedBills.map((b) => {
                 const user = getUserInfo(b.user_id);
+                const parsed = parsePaymentMethod(b.payment_method);
                 return (
                   <tr key={b.id} className="hover:bg-slate-800/30 transition-colors">
                     {/* User Info Column */}
@@ -577,6 +593,16 @@ export const AdminPaymentHistory: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        <Pagination
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          totalItems={filteredBills.length}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setCurrentPage}
+          itemName="transactions"
+        />
       </div>
 
       {/* Add Missing Transaction by Ref Modal */}

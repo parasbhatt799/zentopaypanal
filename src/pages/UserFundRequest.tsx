@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Send, History, CheckCircle2, AlertCircle, RefreshCw, Upload, Eye, Image as ImageIcon, X, Copy, Check, Hash, Landmark, Search } from 'lucide-react';
+import { Pagination } from '../components/Pagination';
 
 export const UserFundRequest: React.FC = () => {
   const { currentUser, fundRequests, submitFundRequest, refreshData } = useAuth();
@@ -126,6 +127,21 @@ export const UserFundRequest: React.FC = () => {
 
     return matchesSearch && matchesStatus && matchesDate;
   });
+
+  // Pagination (10 per page)
+  const ITEMS_PER_PAGE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, dateFilter, startDate, endDate]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUserRequests.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedUserRequests = filteredUserRequests.slice(
+    (safeCurrentPage - 1) * ITEMS_PER_PAGE,
+    safeCurrentPage * ITEMS_PER_PAGE
+  );
 
   // Calculated metrics
   const dateFilteredRequests = userRequests.filter(r => checkDateMatch(r.created_at));
@@ -850,7 +866,7 @@ export const UserFundRequest: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 text-xs text-slate-300">
-                    {filteredUserRequests.map((req) => (
+                    {paginatedUserRequests.map((req) => (
                       <tr key={req.id} className="hover:bg-slate-800/20 transition-all">
                         <td className="py-4 pr-2 font-semibold text-white font-mono">
                           ₹{req.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -919,6 +935,16 @@ export const UserFundRequest: React.FC = () => {
                 </table>
               </div>
             )}
+
+            {/* Pagination */}
+            <Pagination
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              totalItems={filteredUserRequests.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setCurrentPage}
+              itemName="requests"
+            />
           </div>
         </div>
       </div>
