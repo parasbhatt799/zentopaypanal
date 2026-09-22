@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import type { CreditCardBill } from '../types';
 import { parsePaymentMethod } from './CreditCardBillPay';
+import { extractBillIdentifiers } from '../utils/billUtils';
 import { 
   Receipt, Search, Clock, CheckCircle2, XCircle, 
-  History, Calendar, Filter, FileText, ChevronRight, X, RefreshCw 
+  History, Calendar, Filter, FileText, ChevronRight, X, RefreshCw,
+  Copy, Check
 } from 'lucide-react';
 import { Pagination } from '../components/Pagination';
 
@@ -14,6 +16,13 @@ export const UserBillHistory: React.FC = () => {
   const userBills = bills.filter((b) => b.user_id === currentUser?.id);
   const [checkingBillId, setCheckingBillId] = useState<string | null>(null);
   const [historyToast, setHistoryToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
 
 
@@ -84,15 +93,20 @@ export const UserBillHistory: React.FC = () => {
   // Filter bills
   const filteredUserBills = userBills.filter((b) => {
     const parsed = parsePaymentMethod(b.payment_method);
+    const ids = extractBillIdentifiers(b);
+    const searchLower = searchTerm.toLowerCase();
+
     const matchesSearch =
-      b.transaction_ref.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.bank_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.card_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parsed.method.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parsed.billerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parsed.mobile.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      b.transaction_ref.toLowerCase().includes(searchLower) ||
+      (ids.orderId && ids.orderId.toLowerCase().includes(searchLower)) ||
+      (ids.bbpsRef && ids.bbpsRef.toLowerCase().includes(searchLower)) ||
+      b.bank_name.toLowerCase().includes(searchLower) ||
+      b.card_number.toLowerCase().includes(searchLower) ||
+      parsed.method.toLowerCase().includes(searchLower) ||
+      parsed.billerId.toLowerCase().includes(searchLower) ||
+      parsed.mobile.toLowerCase().includes(searchLower) ||
       b.amount.toString().includes(searchTerm) ||
-      b.status.toLowerCase().includes(searchTerm.toLowerCase());
+      b.status.toLowerCase().includes(searchLower);
 
     const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
     const matchesDate = checkDateMatch(b.created_at);
@@ -282,7 +296,7 @@ export const UserBillHistory: React.FC = () => {
                   <th className="py-3 px-4">Date & Time</th>
                   <th className="py-3 px-4">Biller ID</th>
                   <th className="py-3 px-4">Customer Mobile</th>
-                  <th className="py-3 px-4">Ref Number</th>
+                  <th className="py-3 px-4">Ref / Order ID</th>
                   <th className="py-3 px-4">Card Issuer / Bank</th>
                   <th className="py-3 px-4">Card Number</th>
                   <th className="py-3 px-4">Paid Amount</th>
@@ -294,6 +308,7 @@ export const UserBillHistory: React.FC = () => {
               <tbody className="divide-y divide-slate-800/60">
                 {paginatedUserBills.map((b) => {
                   const parsed = parsePaymentMethod(b.payment_method);
+                  const ids = extractBillIdentifiers(b);
                   return (
                     <tr key={b.id} className="hover:bg-slate-800/30 transition-colors">
                       <td className="py-3 px-4 text-slate-300 whitespace-nowrap">
@@ -308,11 +323,65 @@ export const UserBillHistory: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 font-mono text-slate-300">{parsed.billerId}</td>
                       <td className="py-3 px-4 font-mono text-slate-300">{parsed.mobile}</td>
-                      <td className="py-3 px-4 font-mono text-indigo-400 font-semibold text-xs">
-                        <div>{b.transaction_ref}</div>
-                        {(b.client_transaction_id || parsed.clientTxnId) && (b.client_transaction_id || parsed.clientTxnId) !== b.transaction_ref && (
-                          <div className="text-[10px] text-slate-400 font-normal mt-0.5">Order: {b.client_transaction_id || parsed.clientTxnId}</div>
-                        )}
+                      <td className="py-3 px-4 font-mono text-xs">
+                        <div className="flex flex-col gap-1">
+                          {/* Order ID (TXN_ORD_...) */}
+                          {ids.orderId && (
+                            <div className="flex items-center gap-1.5 group/ord">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-violet-500/15 text-violet-300 border border-violet-500/30 shrink-0">
+                                ORDER
+                              </span>
+                              <span className="text-violet-200 font-semibold select-all text-xs" title={`Order ID: ${ids.orderId}`}>
+                                {ids.orderId}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(ids.orderId!, `ord-${b.id}`)}
+                                title="Copy Order ID"
+                                className="opacity-60 hover:opacity-100 transition-opacity p-0.5 text-violet-400 hover:text-white"
+                              >
+                                {copiedId === `ord-${b.id}` ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* BBPS Reference (BBPSU...) */}
+                          {ids.bbpsRef && (
+                            <div className="flex items-center gap-1.5 group/bbps">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">
+                                BBPS
+                              </span>
+                              <span className="text-emerald-200 font-semibold select-all text-xs" title={`BBPS Ref: ${ids.bbpsRef}`}>
+                                {ids.bbpsRef}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(ids.bbpsRef!, `bbps-${b.id}`)}
+                                title="Copy BBPS Ref"
+                                className="opacity-60 hover:opacity-100 transition-opacity p-0.5 text-emerald-400 hover:text-white"
+                              >
+                                {copiedId === `bbps-${b.id}` ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Fallback if neither orderId nor bbpsRef */}
+                          {!ids.orderId && !ids.bbpsRef && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-indigo-400 font-semibold text-xs select-all">
+                                {b.transaction_ref}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(b.transaction_ref, `ref-${b.id}`)}
+                                title="Copy Reference"
+                                className="opacity-60 hover:opacity-100 transition-opacity p-0.5 text-indigo-400 hover:text-white"
+                              >
+                                {copiedId === `ref-${b.id}` ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-200">{b.bank_name}</td>
                       <td className="py-3 px-4 font-mono text-slate-300">{b.card_number}</td>
@@ -419,48 +488,101 @@ export const UserBillHistory: React.FC = () => {
                   <h3 className="text-xl font-extrabold text-white">Bill Payment Failed</h3>
                 </>
               )}
-              <p className="text-xs text-slate-400 mt-1">Transaction Ref: <span className="font-mono text-indigo-300 font-bold">{receiptBill.transaction_ref}</span></p>
+              {(() => {
+                const rIds = extractBillIdentifiers(receiptBill);
+                return (
+                  <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center justify-center gap-2">
+                    {rIds.orderId && (
+                      <span className="inline-flex items-center gap-1 font-mono text-violet-300 font-semibold bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20">
+                        Order: {rIds.orderId}
+                      </span>
+                    )}
+                    {rIds.bbpsRef && (
+                      <span className="inline-flex items-center gap-1 font-mono text-emerald-300 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        BBPS: {rIds.bbpsRef}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
-            <div className="space-y-3 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Card Issuer</span>
-                <span className="font-bold text-slate-200">{receiptBill.bank_name}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Card Number</span>
-                <span className="font-mono text-slate-200">{receiptBill.card_number}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Cardholder Name</span>
-                <span className="font-semibold text-slate-200">{receiptBill.cardholder_name}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Payment Status</span>
-                <span className={`font-bold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider ${
-                  receiptBill.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                  receiptBill.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                  'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                }`}>{receiptBill.status}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Payment Amount</span>
-                <span className={`font-extrabold font-mono text-sm ${
-                  receiptBill.status === 'Success' ? 'text-emerald-400' :
-                  receiptBill.status === 'Pending' ? 'text-amber-400' : 'text-rose-400'
-                }`}>₹{receiptBill.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Payment Gateway</span>
-                <span className="text-slate-300">{parsePaymentMethod(receiptBill.payment_method).method}</span>
-              </div>
-              {parsePaymentMethod(receiptBill.payment_method).clientTxnId && (
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-400">Client Order ID</span>
-                  <span className="font-mono text-indigo-300 font-semibold text-[11px]">{parsePaymentMethod(receiptBill.payment_method).clientTxnId}</span>
+            {(() => {
+              const rIds = extractBillIdentifiers(receiptBill);
+              return (
+                <div className="space-y-3 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
+                  {rIds.orderId && (
+                    <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                      <span className="text-slate-400 font-medium">Order ID</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-violet-300 font-bold text-xs">{rIds.orderId}</span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(rIds.orderId!, 'modal-ord')}
+                          title="Copy Order ID"
+                          className="p-1 text-violet-400 hover:text-white"
+                        >
+                          {copiedId === 'modal-ord' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {rIds.bbpsRef && (
+                    <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                      <span className="text-slate-400 font-medium">BBPS Reference</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-emerald-300 font-bold text-xs">{rIds.bbpsRef}</span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(rIds.bbpsRef!, 'modal-bbps')}
+                          title="Copy BBPS Reference"
+                          className="p-1 text-emerald-400 hover:text-white"
+                        >
+                          {copiedId === 'modal-bbps' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Card Issuer</span>
+                    <span className="font-bold text-slate-200">{receiptBill.bank_name}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Card Number</span>
+                    <span className="font-mono text-slate-200">{receiptBill.card_number}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Cardholder Name</span>
+                    <span className="font-semibold text-slate-200">{receiptBill.cardholder_name}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Payment Status</span>
+                    <span className={`font-bold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider ${
+                      receiptBill.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                      receiptBill.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                      'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                    }`}>{receiptBill.status}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Payment Amount</span>
+                    <span className={`font-extrabold font-mono text-sm ${
+                      receiptBill.status === 'Success' ? 'text-emerald-400' :
+                      receiptBill.status === 'Pending' ? 'text-amber-400' : 'text-rose-400'
+                    }`}>₹{receiptBill.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Payment Gateway</span>
+                    <span className="text-slate-300">{parsePaymentMethod(receiptBill.payment_method).method}</span>
+                  </div>
+                  {!rIds.orderId && !rIds.bbpsRef && (
+                    <div className="flex justify-between py-1">
+                      <span className="text-slate-400">Transaction Ref</span>
+                      <span className="font-mono text-indigo-300 font-semibold text-[11px]">{receiptBill.transaction_ref}</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
 
             {receiptBill.status === 'Pending' && (
               <button

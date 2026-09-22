@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { CreditCard, CheckCircle2, ShieldCheck, Zap, Receipt, AlertCircle, Sparkles, ArrowRight, Phone, Flame, Droplets, Tv, Wifi, Car, DollarSign, Clock, XCircle, Search, X } from 'lucide-react';
+import { CreditCard, CheckCircle2, ShieldCheck, Zap, Receipt, AlertCircle, Sparkles, ArrowRight, Phone, Flame, Droplets, Tv, Wifi, Car, DollarSign, Clock, XCircle, Search, X, Copy, Check } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { CreditCardBill } from '../types';
+import { extractBillIdentifiers } from '../utils/billUtils';
 import bharatConnectLogo from '../assets/bharat connect.svg';
 
 const PRESET_CC_BILLERS = [
@@ -128,6 +129,13 @@ export const CreditCardBillPay: React.FC = () => {
   const { currentUser, bills, payBill, checkBillStatus, theme } = useAuth();
   const [isCheckingModalStatus, setIsCheckingModalStatus] = useState(false);
   const [modalStatusMsg, setModalStatusMsg] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const PRESET_CATEGORIES = [
     "Credit Card",
@@ -1773,48 +1781,101 @@ export const CreditCardBillPay: React.FC = () => {
                   <h3 className="text-xl font-extrabold text-white">Bill Payment Failed</h3>
                 </>
               )}
-              <p className="text-xs text-slate-400 mt-1">Transaction Ref: <span className="font-mono text-indigo-300 font-bold">{receiptBill.transaction_ref}</span></p>
+              {(() => {
+                const rIds = extractBillIdentifiers(receiptBill);
+                return (
+                  <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center justify-center gap-2">
+                    {rIds.orderId && (
+                      <span className="inline-flex items-center gap-1 font-mono text-violet-300 font-semibold bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20">
+                        Order: {rIds.orderId}
+                      </span>
+                    )}
+                    {rIds.bbpsRef && (
+                      <span className="inline-flex items-center gap-1 font-mono text-emerald-300 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        BBPS: {rIds.bbpsRef}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
-            <div className="space-y-3 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Card Issuer / Biller</span>
-                <span className="font-bold text-slate-200">{receiptBill.bank_name}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Card / Account Number</span>
-                <span className="font-mono text-slate-200">{receiptBill.card_number}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Cardholder / Customer Name</span>
-                <span className="font-semibold text-slate-200">{receiptBill.cardholder_name}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Payment Status</span>
-                <span className={`font-bold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider ${
-                  receiptBill.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                  receiptBill.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                  'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                }`}>{receiptBill.status}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Payment Amount</span>
-                <span className={`font-extrabold font-mono text-sm ${
-                  receiptBill.status === 'Success' ? 'text-emerald-400' :
-                  receiptBill.status === 'Pending' ? 'text-amber-400' : 'text-rose-400'
-                }`}>₹{receiptBill.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Payment Gateway</span>
-                <span className="text-slate-300">{parsePaymentMethod(receiptBill.payment_method).method}</span>
-              </div>
-              {parsePaymentMethod(receiptBill.payment_method).clientTxnId && (
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-400">Client Order ID</span>
-                  <span className="font-mono text-indigo-300 font-semibold text-[11px]">{parsePaymentMethod(receiptBill.payment_method).clientTxnId}</span>
+            {(() => {
+              const rIds = extractBillIdentifiers(receiptBill);
+              return (
+                <div className="space-y-3 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
+                  {rIds.orderId && (
+                    <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                      <span className="text-slate-400 font-medium">Order ID</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-violet-300 font-bold text-xs">{rIds.orderId}</span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(rIds.orderId!, 'pay-modal-ord')}
+                          title="Copy Order ID"
+                          className="p-1 text-violet-400 hover:text-white"
+                        >
+                          {copiedId === 'pay-modal-ord' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {rIds.bbpsRef && (
+                    <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                      <span className="text-slate-400 font-medium">BBPS Reference</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-emerald-300 font-bold text-xs">{rIds.bbpsRef}</span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(rIds.bbpsRef!, 'pay-modal-bbps')}
+                          title="Copy BBPS Reference"
+                          className="p-1 text-emerald-400 hover:text-white"
+                        >
+                          {copiedId === 'pay-modal-bbps' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Card Issuer / Biller</span>
+                    <span className="font-bold text-slate-200">{receiptBill.bank_name}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Card / Account Number</span>
+                    <span className="font-mono text-slate-200">{receiptBill.card_number}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Cardholder / Customer Name</span>
+                    <span className="font-semibold text-slate-200">{receiptBill.cardholder_name}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Payment Status</span>
+                    <span className={`font-bold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider ${
+                      receiptBill.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                      receiptBill.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                      'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                    }`}>{receiptBill.status}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Payment Amount</span>
+                    <span className={`font-extrabold font-mono text-sm ${
+                      receiptBill.status === 'Success' ? 'text-emerald-400' :
+                      receiptBill.status === 'Pending' ? 'text-amber-400' : 'text-rose-400'
+                    }`}>₹{receiptBill.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Payment Gateway</span>
+                    <span className="text-slate-300">{parsePaymentMethod(receiptBill.payment_method).method}</span>
+                  </div>
+                  {!rIds.orderId && !rIds.bbpsRef && (
+                    <div className="flex justify-between py-1">
+                      <span className="text-slate-400">Transaction Ref</span>
+                      <span className="font-mono text-indigo-300 font-semibold text-[11px]">{receiptBill.transaction_ref}</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Live Check Status Action for Pending Bills */}
             {receiptBill.status === 'Pending' && (

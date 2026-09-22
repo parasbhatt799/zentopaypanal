@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { parsePaymentMethod } from './CreditCardBillPay';
+import { extractBillIdentifiers } from '../utils/billUtils';
 import { 
   FileText, Search, Download, ArrowUpRight, ArrowDownRight, 
-  Calendar, CheckCircle2, Clock, XCircle, Filter, Info, Users 
+  Calendar, CheckCircle2, Clock, XCircle, Filter, Info, Users,
+  Copy, Check 
 } from 'lucide-react';
 
 interface UnifiedTransaction {
@@ -18,11 +20,20 @@ interface UnifiedTransaction {
   amount: number;
   status: string;
   description: string;
+  clientTxnId?: string;
+  bbpsRef?: string;
 }
 
 export const AdminStatement: React.FC = () => {
   const { bills, fundRequests, users } = useAuth();
   const [liveBalances, setLiveBalances] = useState<Record<string, number | string>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,6 +86,7 @@ export const AdminStatement: React.FC = () => {
   const rawTransactions: UnifiedTransaction[] = [
     ...bills.map((b) => {
       const parsed = parsePaymentMethod(b.payment_method);
+      const ids = extractBillIdentifiers(b);
       const user = getUserDetails(b.user_id);
       return {
         id: b.id,
@@ -84,10 +96,12 @@ export const AdminStatement: React.FC = () => {
         userInitial: user.initial,
         date: b.created_at,
         type: 'debit' as const,
-        refId: b.transaction_ref,
+        refId: ids.bbpsRef || b.transaction_ref,
         amount: b.amount,
         status: b.status,
-        description: `Credit Card Bill Pay (${b.bank_name} - ${b.card_number}) via ${parsed.method}`
+        description: `Credit Card Bill Pay (${b.bank_name} - ${b.card_number}) via ${parsed.method}`,
+        clientTxnId: ids.orderId,
+        bbpsRef: ids.bbpsRef,
       };
     }),
     ...fundRequests.map((r) => {
@@ -156,12 +170,15 @@ export const AdminStatement: React.FC = () => {
 
   // Filter global transactions
   const filteredTransactions = sortedTransactions.filter((tx) => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
-      tx.refId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tx.refId.toLowerCase().includes(searchLower) ||
+      (tx.clientTxnId && tx.clientTxnId.toLowerCase().includes(searchLower)) ||
+      (tx.bbpsRef && tx.bbpsRef.toLowerCase().includes(searchLower)) ||
+      tx.description.toLowerCase().includes(searchLower) ||
+      tx.userName.toLowerCase().includes(searchLower) ||
+      tx.userEmail.toLowerCase().includes(searchLower) ||
+      tx.status.toLowerCase().includes(searchLower) ||
       tx.amount.toString().includes(searchTerm);
 
     const matchesType = typeFilter === 'all' || tx.type === typeFilter;
@@ -431,8 +448,64 @@ export const AdminStatement: React.FC = () => {
                   </td>
 
                   {/* Reference ID */}
-                  <td className="py-3.5 px-4 font-mono font-bold text-slate-300">
-                    {tx.refId}
+                  <td className="py-3.5 px-4 font-mono text-xs">
+                    {tx.type === 'debit' ? (
+                      <div className="flex flex-col gap-1">
+                        {tx.clientTxnId && (
+                          <div className="flex items-center gap-1.5 group/ord">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-violet-500/15 text-violet-300 border border-violet-500/30 shrink-0">
+                              ORDER
+                            </span>
+                            <span className="text-violet-200 font-semibold select-all text-xs">
+                              {tx.clientTxnId}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(tx.clientTxnId!, `adm-st-ord-${tx.id}`)}
+                              title="Copy Order ID"
+                              className="opacity-60 hover:opacity-100 transition-opacity p-0.5 text-violet-400 hover:text-white"
+                            >
+                              {copiedId === `adm-st-ord-${tx.id}` ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                            </button>
+                          </div>
+                        )}
+                        {tx.bbpsRef && (
+                          <div className="flex items-center gap-1.5 group/bbps">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">
+                              BBPS
+                            </span>
+                            <span className="text-emerald-200 font-semibold select-all text-xs">
+                              {tx.bbpsRef}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(tx.bbpsRef!, `adm-st-bbps-${tx.id}`)}
+                              title="Copy BBPS Ref"
+                              className="opacity-60 hover:opacity-100 transition-opacity p-0.5 text-emerald-400 hover:text-white"
+                            >
+                              {copiedId === `adm-st-bbps-${tx.id}` ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                            </button>
+                          </div>
+                        )}
+                        {!tx.clientTxnId && !tx.bbpsRef && (
+                          <span className="text-indigo-400 font-semibold text-xs select-all">
+                            {tx.refId}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 group/utr">
+                        <span className="font-bold text-xs text-slate-200 select-all">{tx.refId}</span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(tx.refId, `adm-st-utr-${tx.id}`)}
+                          title="Copy UTR"
+                          className="opacity-60 hover:opacity-100 transition-opacity p-0.5 text-slate-400 hover:text-white"
+                        >
+                          {copiedId === `adm-st-utr-${tx.id}` ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                        </button>
+                      </div>
+                    )}
                   </td>
 
                   {/* Description */}

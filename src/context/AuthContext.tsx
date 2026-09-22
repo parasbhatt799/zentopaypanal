@@ -11,6 +11,7 @@ import {
   saveMaintenance,
   fetchAllSupabaseRows,
 } from '../lib/supabase';
+import { extractBillIdentifiers } from '../utils/billUtils';
 
 const MOCK_B2B_CONFIG_KEY = 'zentopay_b2b_config';
 
@@ -1463,29 +1464,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('User API credentials (x-api-key, x-secret-key) not configured in profile.');
     }
 
-    // Parse payment method to find clientTxnId if stored
-    let clientOrderId = bill.client_transaction_id;
-    if (!clientOrderId && bill.payment_method && bill.payment_method.includes('|')) {
-      const parts = bill.payment_method.split('|');
-      if (parts[3]) {
-        clientOrderId = parts[3];
-      }
-    }
-    if (!clientOrderId && bill.transaction_ref.startsWith('TXN_ORD_')) {
-      clientOrderId = bill.transaction_ref.split(' ')[0];
-    }
+    // Extract BBPS Ref (BBPSU...), Order ID (TXN_ORD_...), and API Txn ID
+    const { orderId, bbpsRef, apiTxnId } = extractBillIdentifiers(bill);
 
-    let apiTxnId = bill.api_transaction_id;
-    const refToken = bill.transaction_ref.split(' ')[0];
-    if (!apiTxnId && refToken && !refToken.startsWith('TXN_ORD_') && !refToken.startsWith('USEPAY_')) {
-      apiTxnId = refToken;
-    }
-
-    // Build ordered list of candidate query IDs (API Transaction ID & Custom Client Order ID)
+    // Build ordered list of candidate query IDs: Query BOTH BBPS Reference and Custom Order ID!
     const candidates: string[] = [];
     if (customId && customId.trim()) candidates.push(customId.trim());
+    if (bbpsRef && !candidates.includes(bbpsRef)) candidates.push(bbpsRef);
+    if (orderId && !candidates.includes(orderId)) candidates.push(orderId);
     if (apiTxnId && !candidates.includes(apiTxnId)) candidates.push(apiTxnId);
-    if (clientOrderId && !candidates.includes(clientOrderId)) candidates.push(clientOrderId);
+    const refToken = bill.transaction_ref ? bill.transaction_ref.split(' ')[0] : '';
     if (refToken && !candidates.includes(refToken)) candidates.push(refToken);
 
     let statusData: any = null;
@@ -1539,16 +1527,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Extract identifiers returned by API
     const returnedApiTxnId = statusData.transaction_id || apiTxnId;
-    const returnedBbpsRef = (statusData.bbps_txn_ref_id && statusData.bbps_txn_ref_id !== 'N/A') ? statusData.bbps_txn_ref_id : bill.bbps_ref_id;
-    const returnedClientOrderId = statusData.client_transaction_id || clientOrderId;
+    const returnedBbpsRef = (statusData.bbps_txn_ref_id && statusData.bbps_txn_ref_id !== 'N/A') ? statusData.bbps_txn_ref_id : (bbpsRef || bill.bbps_ref_id);
+    const returnedClientOrderId = statusData.client_transaction_id || orderId || bill.client_transaction_id;
 
     let updatedTxnRef = bill.transaction_ref;
-    if (returnedBbpsRef && returnedApiTxnId) {
-      updatedTxnRef = `${returnedApiTxnId} (BBPS: ${returnedBbpsRef})`;
+    if (returnedBbpsRef && returnedApiTxnId && returnedBbpsRef !== returnedApiTxnId) {
+      updatedTxnRef = `${returnedBbpsRef} (${returnedApiTxnId})`;
+    } else if (returnedBbpsRef) {
+      updatedTxnRef = returnedBbpsRef;
     } else if (returnedApiTxnId) {
       updatedTxnRef = returnedApiTxnId;
     } else if (returnedClientOrderId && bill.transaction_ref.startsWith('USEPAY_')) {
       updatedTxnRef = returnedClientOrderId;
+    }
+
+    // Ensure payment_method stores the 4th pipe for clientTxnId so it persists in Supabase
+    let updatedPaymentMethod = bill.payment_method;
+    if (returnedClientOrderId) {
+      if (updatedPaymentMethod && updatedPaymentMethod.includes('|')) {
+        const parts = updatedPaymentMethod.split('|');
+        if (!parts[3] || parts[3] !== returnedClientOrderId) {
+          parts[3] = returnedClientOrderId;
+          updatedPaymentMethod = parts.join('|');
+        }
+      } else if (updatedPaymentMethod) {
+        updatedPaymentMethod = `${updatedPaymentMethod}|||${returnedClientOrderId}`;
+      }
     }
 
     // Update in state
@@ -1559,6 +1563,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               ...b,
               status: newStatus,
               transaction_ref: updatedTxnRef,
+              payment_method: updatedPaymentMethod,
               api_transaction_id: returnedApiTxnId,
               bbps_ref_id: returnedBbpsRef,
               client_transaction_id: returnedClientOrderId,
@@ -1575,6 +1580,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .update({
             status: newStatus,
             transaction_ref: updatedTxnRef,
+            payment_method: updatedPaymentMethod,
           })
           .eq('id', bill.id);
       } catch (dbErr) {
