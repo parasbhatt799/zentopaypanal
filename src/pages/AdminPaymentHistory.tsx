@@ -565,7 +565,6 @@ export const AdminPaymentHistory: React.FC = () => {
                 <th className="py-3.5 px-4">Bank</th>
                 <th className="py-3.5 px-4">Card Number</th>
                 <th className="py-3.5 px-4">Paid Amount</th>
-                <th className="py-3.5 px-4">Method</th>
                 <th className="py-3.5 px-4">Status</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
@@ -682,9 +681,6 @@ export const AdminPaymentHistory: React.FC = () => {
                       ₹{b.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
 
-                    {/* Payment Method Column */}
-                    <td className="py-3.5 px-4 text-slate-400">{parsed.method}</td>
-
                     {/* Status Column */}
                     <td className="py-3.5 px-4">
                       {b.status === 'Success' && (
@@ -751,7 +747,7 @@ export const AdminPaymentHistory: React.FC = () => {
               })}
               {filteredBills.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-slate-500 font-medium">
+                  <td colSpan={10} className="py-8 text-center text-slate-500 font-medium">
                     No matching transactions found.
                   </td>
                 </tr>
