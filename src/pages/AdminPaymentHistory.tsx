@@ -724,7 +724,6 @@ export const AdminPaymentHistory: React.FC = () => {
                 <th className="py-3.5 px-4">Card Number</th>
                 <th className="py-3.5 px-4">Paid Amount</th>
                 <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Details</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -864,43 +863,6 @@ export const AdminPaymentHistory: React.FC = () => {
                       )}
                     </td>
 
-                    {/* Details Column (Admin Side Only) */}
-                    <td className="py-3.5 px-4">
-                      {(() => {
-                        const detail = getBillResponseDetail(b, parsed, ids);
-                        return (
-                          <div
-                            onClick={() => setSelectedDetailsBill(b)}
-                            className={`max-w-[260px] cursor-pointer group flex items-start space-x-2 p-2 rounded-xl border transition-all hover:scale-[1.02] shadow-sm text-xs ${
-                              detail.type === 'failed' || detail.isInsufficient
-                                ? 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-300'
-                                : detail.type === 'pending'
-                                ? 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300'
-                                : 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-                            }`}
-                            title={detail.text}
-                          >
-                            {detail.type === 'failed' ? (
-                              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
-                            ) : detail.type === 'pending' ? (
-                              <Clock className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
-                            ) : (
-                              <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-400" />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate font-mono font-semibold text-[11px] leading-tight group-hover:underline">
-                                {detail.text}
-                              </p>
-                              <span className="text-[9px] text-slate-400 block mt-0.5 flex items-center gap-1">
-                                <Info className="h-2.5 w-2.5" />
-                                <span>Click for full API response</span>
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </td>
-
                     {/* Actions Column */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end space-x-1.5 flex-wrap gap-y-1">
@@ -960,7 +922,7 @@ export const AdminPaymentHistory: React.FC = () => {
               })}
               {filteredBills.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-slate-500 font-medium">
+                  <td colSpan={10} className="py-8 text-center text-slate-500 font-medium">
                     No matching transactions found.
                   </td>
                 </tr>
@@ -1483,8 +1445,9 @@ export const AdminPaymentHistory: React.FC = () => {
         const dUser = getUserInfo(selectedDetailsBill.user_id);
         const dParsed = parsePaymentMethod(selectedDetailsBill.payment_method);
         const dIds = extractBillIdentifiers(selectedDetailsBill);
-        const dResponseMsg = selectedDetailsBill.api_response || dParsed.apiResponse || 'No gateway response recorded for this transaction.';
-        const isInsufficient = dResponseMsg.toLowerCase().includes('insufficient') || dResponseMsg.toLowerCase().includes('security deposit') || dResponseMsg.toLowerCase().includes('usable balance');
+        const detail = getBillResponseDetail(selectedDetailsBill, dParsed, dIds);
+        const dResponseMsg = detail.text;
+        const isInsufficient = detail.isInsufficient;
 
         return (
           <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
