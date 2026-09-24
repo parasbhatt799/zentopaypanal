@@ -205,29 +205,14 @@ export const AdminPaymentHistory: React.FC = () => {
     return true; // all time
   };
 
-  // Calculated metrics based on active date filter
-  const dateFilteredBills = bills.filter(b => checkDateMatch(b.created_at));
-  const successCount = dateFilteredBills.filter(b => b.status === 'Success').length;
-  const successAmount = dateFilteredBills
-    .filter(b => b.status === 'Success')
-    .reduce((acc, b) => acc + b.amount, 0);
-  const pendingCount = dateFilteredBills.filter(b => b.status === 'Pending').length;
-  const pendingAmount = dateFilteredBills
-    .filter(b => b.status === 'Pending')
-    .reduce((acc, b) => acc + b.amount, 0);
-  const failedCount = dateFilteredBills.filter(b => b.status === 'Failed').length;
-  const failedAmount = dateFilteredBills
-    .filter(b => b.status === 'Failed')
-    .reduce((acc, b) => acc + b.amount, 0);
-
-  // Filter bills
-  const filteredBills = bills.filter((b) => {
+  // Base filtered bills: matching active search query (e.g. user name) and date filter
+  const baseFilteredBills = bills.filter((b) => {
     const user = getUserInfo(b.user_id);
     const parsed = parsePaymentMethod(b.payment_method);
     const ids = extractBillIdentifiers(b);
-    const searchLower = searchTerm.toLowerCase();
+    const searchLower = searchTerm.toLowerCase().trim();
     
-    const matchesSearch =
+    const matchesSearch = !searchLower || (
       user.name.toLowerCase().includes(searchLower) ||
       user.email.toLowerCase().includes(searchLower) ||
       b.transaction_ref.toLowerCase().includes(searchLower) ||
@@ -237,13 +222,32 @@ export const AdminPaymentHistory: React.FC = () => {
       b.card_number.toLowerCase().includes(searchLower) ||
       parsed.billerId.toLowerCase().includes(searchLower) ||
       parsed.mobile.toLowerCase().includes(searchLower) ||
-      b.amount.toString().includes(searchTerm) ||
-      b.status.toLowerCase().includes(searchLower);
-      
-    const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
+      b.amount.toString().includes(searchLower) ||
+      b.status.toLowerCase().includes(searchLower)
+    );
+
     const matchesDate = checkDateMatch(b.created_at);
 
-    return matchesSearch && matchesStatus && matchesDate;
+    return matchesSearch && matchesDate;
+  });
+
+  // Calculated metrics based on active search filter and date filter (card amounts reflect searched user)
+  const successCount = baseFilteredBills.filter(b => b.status === 'Success').length;
+  const successAmount = baseFilteredBills
+    .filter(b => b.status === 'Success')
+    .reduce((acc, b) => acc + b.amount, 0);
+  const pendingCount = baseFilteredBills.filter(b => b.status === 'Pending').length;
+  const pendingAmount = baseFilteredBills
+    .filter(b => b.status === 'Pending')
+    .reduce((acc, b) => acc + b.amount, 0);
+  const failedCount = baseFilteredBills.filter(b => b.status === 'Failed').length;
+  const failedAmount = baseFilteredBills
+    .filter(b => b.status === 'Failed')
+    .reduce((acc, b) => acc + b.amount, 0);
+
+  // Filter bills for the table (applying statusFilter)
+  const filteredBills = baseFilteredBills.filter((b) => {
+    return statusFilter === 'all' || b.status === statusFilter;
   });
 
   // Pagination (10 per page)
@@ -550,7 +554,13 @@ export const AdminPaymentHistory: React.FC = () => {
             <span>Add Missing Transaction by Ref</span>
           </button>
 
-          {/* Total Count Badge */}
+          {/* Total Count & Filter Badge */}
+          {searchTerm.trim() && (
+            <span className="text-xs font-semibold px-3 py-2 rounded-xl bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
+              <span>User / Search:</span>
+              <strong className="text-white">"{searchTerm.trim()}"</strong>
+            </span>
+          )}
           <span className="text-xs font-semibold px-3 py-2 rounded-xl bg-slate-900 text-slate-300 border border-slate-800">
             Total {filteredBills.length}
           </span>

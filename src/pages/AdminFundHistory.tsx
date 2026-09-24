@@ -105,36 +105,39 @@ export const AdminFundHistory: React.FC = () => {
     return true; // all time
   };
 
-  // Calculated metrics based on active date filter
-  const dateFilteredRequests = fundRequests.filter(r => checkDateMatch(r.created_at));
-  const approvedCount = dateFilteredRequests.filter(r => r.status === 'approved').length;
-  const approvedAmount = dateFilteredRequests
+  // Base filtered requests: matching active search query (e.g. user name) and date filter
+  const baseFilteredRequests = fundRequests.filter((r) => {
+    const user = getUserInfo(r.user_id);
+    const searchLower = searchTerm.toLowerCase().trim();
+    const matchesSearch = !searchLower || (
+      user.name.toLowerCase().includes(searchLower) ||
+      user.email.toLowerCase().includes(searchLower) ||
+      r.utr_number.toLowerCase().includes(searchLower) ||
+      (r.admin_bank_account_id && r.admin_bank_account_id.toLowerCase().includes(searchLower)) ||
+      r.amount.toString().includes(searchLower) ||
+      r.status.toLowerCase().includes(searchLower)
+    );
+    const matchesDate = checkDateMatch(r.created_at);
+    return matchesSearch && matchesDate;
+  });
+
+  // Calculated metrics based on active search filter and date filter (card amounts reflect searched user)
+  const approvedCount = baseFilteredRequests.filter(r => r.status === 'approved').length;
+  const approvedAmount = baseFilteredRequests
     .filter(r => r.status === 'approved')
     .reduce((acc, r) => acc + r.amount, 0);
-  const pendingCount = dateFilteredRequests.filter(r => r.status === 'pending').length;
-  const pendingAmount = dateFilteredRequests
+  const pendingCount = baseFilteredRequests.filter(r => r.status === 'pending').length;
+  const pendingAmount = baseFilteredRequests
     .filter(r => r.status === 'pending')
     .reduce((acc, r) => acc + r.amount, 0);
-  const rejectedCount = dateFilteredRequests.filter(r => r.status === 'rejected').length;
-  const rejectedAmount = dateFilteredRequests
+  const rejectedCount = baseFilteredRequests.filter(r => r.status === 'rejected').length;
+  const rejectedAmount = baseFilteredRequests
     .filter(r => r.status === 'rejected')
     .reduce((acc, r) => acc + r.amount, 0);
 
-  // Filter requests
-  const filteredRequests = fundRequests.filter((r) => {
-    const user = getUserInfo(r.user_id);
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.utr_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (r.admin_bank_account_id && r.admin_bank_account_id.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      r.amount.toString().includes(searchTerm) ||
-      r.status.toLowerCase().includes(searchTerm.toLowerCase());
-      
-    const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
-    const matchesDate = checkDateMatch(r.created_at);
-
-    return matchesSearch && matchesStatus && matchesDate;
+  // Filter requests for the table (applying statusFilter)
+  const filteredRequests = baseFilteredRequests.filter((r) => {
+    return statusFilter === 'all' || r.status === statusFilter;
   });
 
   // Pagination (10 per page)
@@ -165,9 +168,17 @@ export const AdminFundHistory: React.FC = () => {
             Log of all B2B wallet fund requests submitted by agent members for verification.
           </p>
         </div>
-        <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
-          Total {filteredRequests.length} Requests
-        </span>
+        <div className="flex items-center gap-2">
+          {searchTerm.trim() && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
+              <span>User / Search:</span>
+              <strong className="text-white">"{searchTerm.trim()}"</strong>
+            </span>
+          )}
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
+            Total {filteredRequests.length} Requests
+          </span>
+        </div>
       </div>
 
       {/* 3 Metrics Summary Cards */}
