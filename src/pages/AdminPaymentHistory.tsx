@@ -863,58 +863,57 @@ export const AdminPaymentHistory: React.FC = () => {
                       )}
                     </td>
 
-                    {/* Actions Column */}
+                    {/* Actions Column (Icon-Only Buttons: Details, Receipt, Check Status) */}
                     <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end space-x-1.5 flex-wrap gap-y-1">
-                        {/* Live Status Check Button for Pending & Failed Transactions */}
-                        {(b.status === 'Pending' || b.status === 'Failed') && (
-                          <button
-                            type="button"
-                            onClick={() => handleAdminCheckStatus(b.id)}
-                            disabled={checkingAdminBillId === b.id}
-                            title={`Check Live Status with UsePay API (Current: ${b.status})`}
-                            className={`p-1.5 rounded-lg border transition-all hover:scale-105 inline-flex items-center cursor-pointer ${
-                              b.status === 'Pending' 
-                                ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30' 
-                                : 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border-rose-500/30'
-                            }`}
-                          >
-                            <RefreshCw className={`h-3.5 w-3.5 ${checkingAdminBillId === b.id ? 'animate-spin text-amber-400' : ''}`} />
-                          </button>
-                        )}
+                      <div className="flex items-center justify-end space-x-1.5">
+                        {/* 1. Details Icon Button (Admin Only - View API Response) */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDetailsBill(b)}
+                          title="View UsePay API Gateway Response & Details (Admin Only)"
+                          className="w-7 h-7 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 transition-all hover:scale-110 inline-flex items-center justify-center cursor-pointer shadow-sm"
+                        >
+                          <Info className="h-3.5 w-3.5 text-indigo-400" />
+                        </button>
 
-                        {/* ONLY Show 'Mark as Failed' if transaction is Pending AND never reached UsePay API */}
+                        {/* 2. Receipt Icon Button */}
+                        <button
+                          type="button"
+                          onClick={() => setReceiptBill(b)}
+                          title="View & Download Receipt"
+                          className="w-7 h-7 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-all hover:scale-110 inline-flex items-center justify-center cursor-pointer shadow-sm"
+                        >
+                          <Receipt className="h-3.5 w-3.5 text-emerald-300" />
+                        </button>
+
+                        {/* 3. Live Status Check Icon Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleAdminCheckStatus(b.id)}
+                          disabled={checkingAdminBillId === b.id}
+                          title={`Check / Sync Live Status with UsePay API (Current: ${b.status})`}
+                          className={`w-7 h-7 rounded-lg border transition-all hover:scale-110 inline-flex items-center justify-center cursor-pointer shadow-sm ${
+                            b.status === 'Pending' 
+                              ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30' 
+                              : b.status === 'Failed'
+                              ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border-rose-500/30'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${checkingAdminBillId === b.id ? 'animate-spin text-amber-400' : ''}`} />
+                        </button>
+
+                        {/* 4. Mark as Failed (Only if transaction is Pending AND never reached UsePay API) */}
                         {b.status === 'Pending' && didNotReachApi && (
                           <button
                             type="button"
                             onClick={() => setBillToMarkFailed(b)}
                             title="Mark as Failed (Request never reached UsePay API)"
-                            className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-semibold text-[11px] transition-all hover:scale-105 inline-flex items-center space-x-1 cursor-pointer shadow-sm"
+                            className="w-7 h-7 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition-all hover:scale-110 inline-flex items-center justify-center cursor-pointer shadow-sm"
                           >
                             <XCircle className="h-3.5 w-3.5 text-rose-400" />
-                            <span>Mark Failed</span>
                           </button>
                         )}
-
-                        {/* Details Button (Admin Only) */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDetailsBill(b)}
-                          title="View Full UsePay API Gateway Response & Details (Admin Only)"
-                          className="px-2.5 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 font-semibold text-[11px] inline-flex items-center space-x-1 transition-all hover:scale-105 cursor-pointer shadow-sm"
-                        >
-                          <Info className="h-3.5 w-3.5 text-indigo-400" />
-                          <span>Details</span>
-                        </button>
-
-                        {/* Receipt Button */}
-                        <button
-                          onClick={() => setReceiptBill(b)}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold text-[11px] inline-flex items-center space-x-1 border border-slate-700 transition-all cursor-pointer"
-                        >
-                          <Receipt className="h-3.5 w-3.5" />
-                          <span>Receipt</span>
-                        </button>
                       </div>
                     </td>
                   </tr>
