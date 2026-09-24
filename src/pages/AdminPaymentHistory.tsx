@@ -131,6 +131,21 @@ export const AdminPaymentHistory: React.FC = () => {
     return true; // all time
   };
 
+  // Calculated metrics based on active date filter
+  const dateFilteredBills = bills.filter(b => checkDateMatch(b.created_at));
+  const successCount = dateFilteredBills.filter(b => b.status === 'Success').length;
+  const successAmount = dateFilteredBills
+    .filter(b => b.status === 'Success')
+    .reduce((acc, b) => acc + b.amount, 0);
+  const pendingCount = dateFilteredBills.filter(b => b.status === 'Pending').length;
+  const pendingAmount = dateFilteredBills
+    .filter(b => b.status === 'Pending')
+    .reduce((acc, b) => acc + b.amount, 0);
+  const failedCount = dateFilteredBills.filter(b => b.status === 'Failed').length;
+  const failedAmount = dateFilteredBills
+    .filter(b => b.status === 'Failed')
+    .reduce((acc, b) => acc + b.amount, 0);
+
   // Filter bills
   const filteredBills = bills.filter((b) => {
     const user = getUserInfo(b.user_id);
@@ -465,6 +480,81 @@ export const AdminPaymentHistory: React.FC = () => {
           <span className="text-xs font-semibold px-3 py-2 rounded-xl bg-slate-900 text-slate-300 border border-slate-800">
             Total {filteredBills.length}
           </span>
+        </div>
+      </div>
+
+      {/* 3 Metrics Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        {/* 1. Success Card */}
+        <div 
+          onClick={() => setStatusFilter(statusFilter === 'Success' ? 'all' : 'Success')}
+          className={`p-5 rounded-2xl bg-slate-900/40 border backdrop-blur-md relative overflow-hidden group hover:border-emerald-500/50 transition-all shadow-lg shadow-emerald-950/20 cursor-pointer ${
+            statusFilter === 'Success' ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-emerald-500/20'
+          }`}
+          title="Click to filter Success transactions"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all pointer-events-none" />
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Success Total</div>
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-emerald-400 mt-2 font-mono">
+            ₹{successAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </div>
+          <div className="text-[11px] text-emerald-400/80 mt-1 font-semibold flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>{successCount.toLocaleString('en-IN')} Success Entries</span>
+          </div>
+        </div>
+
+        {/* 2. Pending Card */}
+        <div 
+          onClick={() => setStatusFilter(statusFilter === 'Pending' ? 'all' : 'Pending')}
+          className={`p-5 rounded-2xl bg-slate-900/40 border backdrop-blur-md relative overflow-hidden group hover:border-amber-500/50 transition-all shadow-lg shadow-amber-950/20 cursor-pointer ${
+            statusFilter === 'Pending' ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-amber-500/20'
+          }`}
+          title="Click to filter Pending transactions"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all pointer-events-none" />
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Pending Total</div>
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <Clock className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-amber-400 mt-2 font-mono">
+            ₹{pendingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </div>
+          <div className="text-[11px] text-amber-400/80 mt-1 font-semibold flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span>{pendingCount.toLocaleString('en-IN')} Pending Entries</span>
+          </div>
+        </div>
+
+        {/* 3. Failed Card */}
+        <div 
+          onClick={() => setStatusFilter(statusFilter === 'Failed' ? 'all' : 'Failed')}
+          className={`p-5 rounded-2xl bg-slate-900/40 border backdrop-blur-md relative overflow-hidden group hover:border-rose-500/50 transition-all shadow-lg shadow-rose-950/20 cursor-pointer ${
+            statusFilter === 'Failed' ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-rose-500/20'
+          }`}
+          title="Click to filter Failed transactions"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-full blur-2xl group-hover:bg-rose-500/10 transition-all pointer-events-none" />
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Failed Total</div>
+            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+              <XCircle className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-rose-400 mt-2 font-mono">
+            ₹{failedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </div>
+          <div className="text-[11px] text-rose-400/80 mt-1 font-semibold flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-400" />
+            <span>{failedCount.toLocaleString('en-IN')} Failed Entries</span>
+          </div>
         </div>
       </div>
 
