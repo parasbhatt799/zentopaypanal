@@ -1153,20 +1153,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(resData.message || 'Failed to submit fund request to UsePay.');
       }
 
-      const reqData = resData.data;
+      const reqData = resData?.data || resData || {};
+      const extractedId = (reqData.request_id || reqData.id || resData?.request_id || resData?.id || `fr_${Date.now()}`).toString().trim();
+      const cleanUtr = (reqData.utr_number || utrNumber).toString().trim();
+
       const newRequest: FundRequest = {
-        id: reqData.request_id,
+        id: extractedId,
         user_id: currentUser.id,
         amount: parseFloat((reqData.amount || amount).toString()),
-        utr_number: reqData.utr_number || utrNumber,
-        admin_bank_account_id: adminBankAccountId || null,
+        utr_number: cleanUtr,
+        admin_bank_account_id: adminBankAccountId?.trim() || null,
         proof_url: proofUrl || null,
         status: reqData.status || 'pending',
-        created_at: reqData.submitted_at || new Date().toISOString(),
-        updated_at: reqData.submitted_at || new Date().toISOString()
+        created_at: reqData.submitted_at || reqData.created_at || new Date().toISOString(),
+        updated_at: reqData.submitted_at || reqData.created_at || new Date().toISOString()
       };
 
-      setFundRequests(prev => [newRequest, ...prev]);
+      setFundRequests(prev => [newRequest, ...prev.filter(r => r.id !== newRequest.id && r.utr_number.toLowerCase() !== newRequest.utr_number.toLowerCase())]);
 
       if (isSupabaseConfigured && supabase) {
         try {
@@ -1233,21 +1236,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 normStatus = 'approved';
               }
 
-              const exists = fundRequestsRef.current.some(
-                r => r.id === item.request_id || (r.utr_number && item.utr_number && r.utr_number.toLowerCase() === item.utr_number.toLowerCase())
+              const itemId = (item.request_id || item.id || '').toString().trim();
+              const itemUtr = (item.utr_number || '').toString().trim().toLowerCase();
+
+              const existing = fundRequestsRef.current.find(
+                r => (itemId && r.id === itemId) || 
+                     (itemUtr && r.utr_number && r.utr_number.toLowerCase().trim() === itemUtr)
               );
 
-              if (!exists) {
+              if (!existing) {
                 missingEntries.push({
-                  id: item.request_id,
+                  id: itemId || `fr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
                   user_id: activeUserId,
                   amount: parseFloat(item.amount.toString()),
-                  utr_number: item.utr_number,
+                  utr_number: (item.utr_number || '').trim(),
                   admin_bank_account_id: item.admin_bank_account_id || null,
                   proof_url: item.proof_url || null,
                   status: normStatus,
-                  created_at: item.created_at || new Date().toISOString(),
-                  updated_at: item.created_at || new Date().toISOString()
+                  created_at: item.created_at || item.submitted_at || new Date().toISOString(),
+                  updated_at: item.created_at || item.submitted_at || new Date().toISOString()
                 });
               }
             }

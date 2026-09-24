@@ -1,11 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { DollarSign, CheckCircle2, Clock, XCircle, FileText, ExternalLink, Search, RefreshCw } from 'lucide-react';
+import { DollarSign, CheckCircle2, Clock, XCircle, FileText, ExternalLink, Search, RefreshCw, Landmark } from 'lucide-react';
 import { Pagination } from '../components/Pagination';
+import type { BankAccount } from '../lib/usepay_b2b_client';
 
 export const AdminFundHistory: React.FC = () => {
-  const { fundRequests, users, checkFundRequestStatus } = useAuth();
+  const { currentUser, fundRequests, users, checkFundRequestStatus } = useAuth();
   const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+
+  // Fetch admin bank accounts for friendly display
+  useEffect(() => {
+    const fetchBanks = async () => {
+      const activeUser = users.find(u => u.x_api_key && u.x_secret_key) || currentUser;
+      if (!activeUser?.x_api_key || !activeUser?.x_secret_key) return;
+      try {
+        const res = await fetch('/api/v1/b2b/admin-bank-accounts', {
+          headers: {
+            'x-api-key': activeUser.x_api_key.trim(),
+            'x-secret-key': activeUser.x_secret_key.trim(),
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'success' && Array.isArray(data.data)) {
+            setBankAccounts(data.data);
+          }
+        }
+      } catch (err) {
+        console.warn('AdminFundHistory: Could not fetch bank accounts:', err);
+      }
+    };
+    fetchBanks();
+  }, [users, currentUser]);
 
   const handleCheckStatus = async (requestId: string) => {
     setCheckingStatusId(requestId);
@@ -343,8 +370,27 @@ export const AdminFundHistory: React.FC = () => {
                     {/* UTR Number Column */}
                     <td className="py-3.5 px-4 font-mono text-indigo-400 font-bold">{r.utr_number}</td>
 
-                    {/* Admin Bank Account ID Column */}
-                    <td className="py-3.5 px-4 text-slate-300">{r.admin_bank_account_id || 'N/A'}</td>
+                    {/* Admin Bank Account Column */}
+                    <td className="py-3.5 px-4">
+                      {r.admin_bank_account_id ? (
+                        (() => {
+                          const bank = bankAccounts.find(b => b.bank_account_id === r.admin_bank_account_id);
+                          return (
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-slate-200 text-xs flex items-center gap-1">
+                                <Landmark className="h-3 w-3 text-emerald-400 shrink-0" />
+                                <span>{bank ? bank.bank_name : 'Deposit Bank'}</span>
+                              </span>
+                              <span className="font-mono text-slate-400 text-[10px] select-all truncate max-w-[160px]" title={r.admin_bank_account_id}>
+                                {bank ? `A/C: ${bank.account_number}` : r.admin_bank_account_id}
+                              </span>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-slate-500 font-medium">N/A</span>
+                      )}
+                    </td>
 
                     {/* Requested Amount Column */}
                     <td className="py-3.5 px-4 font-bold text-white font-mono">
