@@ -78,6 +78,21 @@ export const AdminFundHistory: React.FC = () => {
     return true; // all time
   };
 
+  // Calculated metrics based on active date filter
+  const dateFilteredRequests = fundRequests.filter(r => checkDateMatch(r.created_at));
+  const approvedCount = dateFilteredRequests.filter(r => r.status === 'approved').length;
+  const approvedAmount = dateFilteredRequests
+    .filter(r => r.status === 'approved')
+    .reduce((acc, r) => acc + r.amount, 0);
+  const pendingCount = dateFilteredRequests.filter(r => r.status === 'pending').length;
+  const pendingAmount = dateFilteredRequests
+    .filter(r => r.status === 'pending')
+    .reduce((acc, r) => acc + r.amount, 0);
+  const rejectedCount = dateFilteredRequests.filter(r => r.status === 'rejected').length;
+  const rejectedAmount = dateFilteredRequests
+    .filter(r => r.status === 'rejected')
+    .reduce((acc, r) => acc + r.amount, 0);
+
   // Filter requests
   const filteredRequests = fundRequests.filter((r) => {
     const user = getUserInfo(r.user_id);
@@ -126,6 +141,81 @@ export const AdminFundHistory: React.FC = () => {
         <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
           Total {filteredRequests.length} Requests
         </span>
+      </div>
+
+      {/* 3 Metrics Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        {/* 1. Approved Card */}
+        <div 
+          onClick={() => setStatusFilter(statusFilter === 'approved' ? 'all' : 'approved')}
+          className={`p-5 rounded-2xl bg-slate-900/40 border backdrop-blur-md relative overflow-hidden group hover:border-emerald-500/50 transition-all shadow-lg shadow-emerald-950/20 cursor-pointer ${
+            statusFilter === 'approved' ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-emerald-500/20'
+          }`}
+          title="Click to filter Approved fund requests"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all pointer-events-none" />
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Approved Total</div>
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-emerald-400 mt-2 font-mono">
+            ₹{approvedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </div>
+          <div className="text-[11px] text-emerald-400/80 mt-1 font-semibold flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>{approvedCount.toLocaleString('en-IN')} Approved Requests</span>
+          </div>
+        </div>
+
+        {/* 2. Pending Card */}
+        <div 
+          onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
+          className={`p-5 rounded-2xl bg-slate-900/40 border backdrop-blur-md relative overflow-hidden group hover:border-amber-500/50 transition-all shadow-lg shadow-amber-950/20 cursor-pointer ${
+            statusFilter === 'pending' ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-amber-500/20'
+          }`}
+          title="Click to filter Pending fund requests"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all pointer-events-none" />
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Pending Total</div>
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <Clock className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-amber-400 mt-2 font-mono">
+            ₹{pendingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </div>
+          <div className="text-[11px] text-amber-400/80 mt-1 font-semibold flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span>{pendingCount.toLocaleString('en-IN')} Pending Requests</span>
+          </div>
+        </div>
+
+        {/* 3. Rejected Card */}
+        <div 
+          onClick={() => setStatusFilter(statusFilter === 'rejected' ? 'all' : 'rejected')}
+          className={`p-5 rounded-2xl bg-slate-900/40 border backdrop-blur-md relative overflow-hidden group hover:border-rose-500/50 transition-all shadow-lg shadow-rose-950/20 cursor-pointer ${
+            statusFilter === 'rejected' ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-rose-500/20'
+          }`}
+          title="Click to filter Rejected fund requests"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-full blur-2xl group-hover:bg-rose-500/10 transition-all pointer-events-none" />
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Rejected Total</div>
+            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+              <XCircle className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-rose-400 mt-2 font-mono">
+            ₹{rejectedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </div>
+          <div className="text-[11px] text-rose-400/80 mt-1 font-semibold flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-400" />
+            <span>{rejectedCount.toLocaleString('en-IN')} Rejected Requests</span>
+          </div>
+        </div>
       </div>
 
       {/* Filter Controls Bar */}
