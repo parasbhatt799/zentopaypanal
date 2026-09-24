@@ -555,10 +555,23 @@ export const UserStatement: React.FC = () => {
                           )}
                         </div>
                       ) : (
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                          <XCircle className="h-3 w-3" />
-                          <span>Failed</span>
-                        </span>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                            <XCircle className="h-3 w-3" />
+                            <span>Failed</span>
+                          </span>
+                          {tx.type === 'debit' && (
+                            <button
+                              type="button"
+                              onClick={() => handleCheckStatus(tx.id)}
+                              disabled={checkingTxId === tx.id}
+                              title="Re-check Live Status with UsePay API"
+                              className="p-1 rounded-md bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 transition-all hover:scale-105 inline-flex items-center"
+                            >
+                              <RefreshCw className={`h-3 w-3 ${checkingTxId === tx.id ? 'animate-spin' : ''}`} />
+                            </button>
+                          )}
+                        </div>
                       )}
                     </td>
 

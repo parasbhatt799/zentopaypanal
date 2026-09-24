@@ -11,7 +11,7 @@ import {
   saveMaintenance,
   fetchAllSupabaseRows,
 } from '../lib/supabase';
-import { extractBillIdentifiers } from '../utils/billUtils';
+import { extractBillIdentifiers, resolveGatewayStatus } from '../utils/billUtils';
 
 const MOCK_B2B_CONFIG_KEY = 'zentopay_b2b_config';
 
@@ -1007,11 +1007,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 3. Normal / Success API Response
-    let initialStatus: TransactionStatus = 'Success';
-    const responseStatus = (resData.payment_status || resData.status || resData.data?.current_status || '').toLowerCase();
-    if (responseStatus === 'pending') {
-      initialStatus = 'Pending';
-    }
+    const resolvedStatus = resolveGatewayStatus(resData?.data || resData, 'Success');
+    const initialStatus: TransactionStatus = resolvedStatus === 'Pending' ? 'Pending' : 'Success';
 
     const newBill: CreditCardBill = {
       ...billData,
@@ -1517,16 +1514,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error(`Could not verify status from UsePay. ${lastError}`);
     }
 
-    const currentStatusRaw = (statusData.current_status || statusData.bbps_status || statusData.status || '').toLowerCase();
-    let newStatus: TransactionStatus = bill.status;
-
-    if (currentStatusRaw === 'success' || currentStatusRaw === 'completed') {
-      newStatus = 'Success';
-    } else if (currentStatusRaw === 'failed' || currentStatusRaw === 'failure' || currentStatusRaw === 'rejected' || currentStatusRaw.includes('failed')) {
-      newStatus = 'Failed';
-    } else if (currentStatusRaw === 'pending' || currentStatusRaw === 'processing') {
-      newStatus = 'Pending';
-    }
+    const newStatus: TransactionStatus = resolveGatewayStatus(statusData, bill.status);
 
     // Extract identifiers returned by API
     const returnedApiTxnId = statusData.transaction_id || apiTxnId;

@@ -6,7 +6,7 @@ import {
   Calendar, Check, ShieldCheck, Copy 
 } from 'lucide-react';
 import { parsePaymentMethod } from './CreditCardBillPay';
-import { extractBillIdentifiers } from '../utils/billUtils';
+import { extractBillIdentifiers, resolveGatewayStatus } from '../utils/billUtils';
 import type { TransactionStatus } from '../types';
 import { Pagination } from '../components/Pagination';
 
@@ -194,15 +194,9 @@ export const AdminPaymentHistory: React.FC = () => {
       });
       const data = await res.json();
       if (res.ok && data.status === 'success' && data.data) {
-        const rawStatus = (data.data.current_status || data.data.bbps_status || data.data.status || '').toLowerCase();
-        if (rawStatus === 'success' || rawStatus === 'completed') {
-          setSelectedStatus('Success');
-        } else if (rawStatus === 'failed' || rawStatus === 'error' || rawStatus === 'rejected') {
-          setSelectedStatus('Failed');
-        } else {
-          setSelectedStatus('Pending');
-        }
-        setModalStatusHint(`Verified from UsePay Gateway: Status is ${rawStatus.toUpperCase()} (BBPS: ${data.data.bbps_status || 'N/A'})`);
+        const resolved = resolveGatewayStatus(data.data, 'Pending');
+        setSelectedStatus(resolved);
+        setModalStatusHint(`Verified from UsePay Gateway: Status is ${resolved.toUpperCase()} (Gateway: ${data.data.current_status || 'N/A'}, BBPS: ${data.data.bbps_status || 'N/A'})`);
       } else {
         throw new Error(data.message || 'Reference not found on UsePay.');
       }
@@ -708,14 +702,18 @@ export const AdminPaymentHistory: React.FC = () => {
                     {/* Actions Column */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end space-x-1.5 flex-wrap gap-y-1">
-                        {/* Live Status Check Button for Pending Transactions */}
-                        {b.status === 'Pending' && (
+                        {/* Live Status Check Button for Pending & Failed Transactions */}
+                        {(b.status === 'Pending' || b.status === 'Failed') && (
                           <button
                             type="button"
                             onClick={() => handleAdminCheckStatus(b.id)}
                             disabled={checkingAdminBillId === b.id}
-                            title="Check Live Status with UsePay API"
-                            className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all hover:scale-105 inline-flex items-center cursor-pointer"
+                            title={`Check Live Status with UsePay API (Current: ${b.status})`}
+                            className={`p-1.5 rounded-lg border transition-all hover:scale-105 inline-flex items-center cursor-pointer ${
+                              b.status === 'Pending' 
+                                ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30' 
+                                : 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border-rose-500/30'
+                            }`}
                           >
                             <RefreshCw className={`h-3.5 w-3.5 ${checkingAdminBillId === b.id ? 'animate-spin text-amber-400' : ''}`} />
                           </button>

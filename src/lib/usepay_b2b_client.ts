@@ -13,6 +13,8 @@
  *    In your production backend, ensure your backend server's public IP is registered with UsePay.
  */
 
+import { resolveGatewayStatus } from '../utils/billUtils';
+
 export interface B2BClientConfig {
   apiKey: string;
   secretKey: string;
@@ -326,11 +328,8 @@ export class UsePayB2BClient {
     const baseRef = resData.transaction_id || resData.data?.billPayResponse?.txnReferenceId || '';
     const approvalRef = resData.ExtBillPayResponse?.approvalRefNumber;
 
-    let transactionStatus: 'Success' | 'Pending' = 'Success';
-    const responseStatus = (resData.payment_status || resData.status || resData.data?.current_status || '').toLowerCase();
-    if (responseStatus === 'pending') {
-      transactionStatus = 'Pending';
-    }
+    const resolvedStatus = resolveGatewayStatus(resData?.data || resData, 'Success');
+    const transactionStatus: 'Success' | 'Pending' = resolvedStatus === 'Pending' ? 'Pending' : 'Success';
 
     return {
       transactionRef: baseRef,

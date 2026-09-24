@@ -107,3 +107,111 @@ export const extractBillIdentifiers = (bill: {
     displayRef: ref || orderId || cc01Ref || bbpsTxnId || 'N/A',
   };
 };
+
+/**
+ * Strict Status Hierarchy Logic for UsePay B2B Gateway / BBPS Responses.
+ * 
+ * Rules:
+ * 1. Priority 1 (Authoritative): `current_status` (UsePay Gateway Master State)
+ *    - If Gateway says Pending/Processing/Initiated -> STRICTLY 'Pending'
+ *    - If Gateway says Success/Completed/Settled -> STRICTLY 'Success'
+ *    - If Gateway says Failed/Failure/Rejected/Declined -> STRICTLY 'Failed'
+ * 
+ * 2. Priority 2: `bbps_status` (Downstream BBPS / NPCI / Biller State) - only checked if current_status is absent or uninformative
+ *    - If BBPS says Pending/In Progress/Pending at Biller -> 'Pending'
+ *    - If BBPS says Success/Approved -> 'Success'
+ *    - If BBPS says Failed/Rejected -> 'Failed'
+ * 
+ * 3. Priority 3: `payment_status` / `status` (General payload fields)
+ *    - Evaluated in the same order if priorities 1 & 2 are not conclusive.
+ */
+export const resolveGatewayStatus = (
+  rawStatusData: any,
+  fallbackStatus: 'Success' | 'Pending' | 'Failed' = 'Pending'
+): 'Success' | 'Pending' | 'Failed' => {
+  if (!rawStatusData) return fallbackStatus;
+
+  // Clean strings
+  const currentStatus = (
+    typeof rawStatusData === 'string'
+      ? rawStatusData
+      : rawStatusData.current_status || ''
+  ).trim().toLowerCase();
+
+  const bbpsStatus = (rawStatusData.bbps_status || '').trim().toLowerCase();
+  const paymentStatus = (rawStatusData.payment_status || '').trim().toLowerCase();
+  const generalStatus = (rawStatusData.status || '').trim().toLowerCase();
+
+  const isPendingStr = (val: string): boolean => {
+    if (!val) return false;
+    const pendingKeywords = [
+      'pending',
+      'processing',
+      'queued',
+      'initiated',
+      'in_progress',
+      'in-progress',
+      'in progress',
+      'under_verification',
+      'hold',
+      'biller received',
+      'pending at biller',
+      'received',
+      'created',
+    ];
+    return pendingKeywords.some((k) => val === k || val.includes(k));
+  };
+
+  const isSuccessStr = (val: string): boolean => {
+    if (!val) return false;
+    const successKeywords = [
+      'success',
+      'successful',
+      'completed',
+      'settled',
+      'approved',
+      'paid',
+    ];
+    return successKeywords.some((k) => val === k || val.includes(k));
+  };
+
+  const isFailedStr = (val: string): boolean => {
+    if (!val) return false;
+    const failedKeywords = [
+      'failed',
+      'failure',
+      'rejected',
+      'declined',
+      'cancelled',
+      'canceled',
+      'error',
+      'biller down',
+      'not found',
+    ];
+    return failedKeywords.some((k) => val === k || val.includes(k));
+  };
+
+  // 1. Priority 1: UsePay Gateway Master Status (`current_status`)
+  if (currentStatus) {
+    if (isPendingStr(currentStatus)) return 'Pending';
+    if (isSuccessStr(currentStatus)) return 'Success';
+    if (isFailedStr(currentStatus)) return 'Failed';
+  }
+
+  // 2. Priority 2: Downstream BBPS / NPCI Status (`bbps_status`)
+  if (bbpsStatus) {
+    if (isPendingStr(bbpsStatus)) return 'Pending';
+    if (isSuccessStr(bbpsStatus)) return 'Success';
+    if (isFailedStr(bbpsStatus)) return 'Failed';
+  }
+
+  // 3. Priority 3: Payment Status / General Status Candidate
+  const candidateStatus = paymentStatus || generalStatus;
+  if (candidateStatus) {
+    if (isPendingStr(candidateStatus)) return 'Pending';
+    if (isSuccessStr(candidateStatus)) return 'Success';
+    if (isFailedStr(candidateStatus)) return 'Failed';
+  }
+
+  return fallbackStatus;
+};
