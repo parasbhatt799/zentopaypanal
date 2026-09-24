@@ -81,14 +81,16 @@ export const parsePaymentMethod = (paymentMethodStr: string) => {
       method: parts[0] || 'UPI / NetBanking',
       billerId: parts[1] || 'N/A',
       mobile: parts[2] || 'N/A',
-      clientTxnId: parts[3] || undefined
+      clientTxnId: parts[3] || undefined,
+      apiResponse: parts.slice(4).join('|').trim() || undefined
     };
   }
   return {
     method: paymentMethodStr || 'UPI / NetBanking',
     billerId: 'N/A',
     mobile: 'N/A',
-    clientTxnId: undefined
+    clientTxnId: undefined,
+    apiResponse: undefined
   };
 };
 

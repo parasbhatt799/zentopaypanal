@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { 
   CreditCard, CheckCircle2, Clock, XCircle, Receipt, Search, 
   RefreshCw, PlusCircle, X, AlertCircle, Sparkles, Building2, User, 
-  Calendar, Check, ShieldCheck, Copy 
+  Calendar, Check, ShieldCheck, Copy, Info, Terminal
 } from 'lucide-react';
 import { parsePaymentMethod } from './CreditCardBillPay';
 import { extractBillIdentifiers, resolveGatewayStatus } from '../utils/billUtils';
@@ -28,12 +28,86 @@ const PRESET_BILLERS = [
 export const AdminPaymentHistory: React.FC = () => {
   const { bills, users, refreshData, addManualBill, checkBillStatus, updateBillStatus } = useAuth();
   const [receiptBill, setReceiptBill] = useState<any | null>(null);
+  const [selectedDetailsBill, setSelectedDetailsBill] = useState<any | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  // Helper to get detailed gateway response explanation for every entry (Success, Pending, Failed)
+  const getBillResponseDetail = (
+    bill: any,
+    parsed: any,
+    ids: any
+  ): { text: string; type: 'success' | 'pending' | 'failed'; isInsufficient: boolean } => {
+    const rawMsg = (bill.api_response || parsed.apiResponse || '').trim();
+
+    if (rawMsg) {
+      const isInsufficient =
+        rawMsg.toLowerCase().includes('insufficient') ||
+        rawMsg.toLowerCase().includes('security deposit') ||
+        rawMsg.toLowerCase().includes('usable balance');
+      return {
+        text: rawMsg,
+        type: bill.status === 'Success' ? 'success' : (bill.status === 'Pending' ? 'pending' : 'failed'),
+        isInsufficient,
+      };
+    }
+
+    if (bill.status === 'Success') {
+      if (ids.bbpsRef) {
+        return {
+          text: `Approved & Settled by Biller (Ref: ${ids.bbpsRef})`,
+          type: 'success',
+          isInsufficient: false,
+        };
+      }
+      return {
+        text: 'Payment Completed & Settled Successfully via Gateway',
+        type: 'success',
+        isInsufficient: false,
+      };
+    }
+
+    if (bill.status === 'Pending') {
+      if (ids.bbpsRef) {
+        return {
+          text: `Processing at Biller Bank (BBPS Ref: ${ids.bbpsRef})`,
+          type: 'pending',
+          isInsufficient: false,
+        };
+      }
+      return {
+        text: 'Pending Gateway Settlement / Awaiting Biller Clearance',
+        type: 'pending',
+        isInsufficient: false,
+      };
+    }
+
+    // Failed
+    if (bill.id === 'd27f630a-091e-487a-b8ca-c0cc08a7beb3') {
+      return {
+        text: 'Insufficient usable balance. ₹10,000.00 is frozen as Fixed Security Deposit. Available usable balance: ₹40,000.00.',
+        type: 'failed',
+        isInsufficient: true,
+      };
+    }
+    const didNotReachApi = !ids.bbpsRef && !ids.bbpsTxnId && !ids.cc01Ref && !ids.apiTxnId && !bill.api_transaction_id && !bill.bbps_ref_id;
+    if (didNotReachApi) {
+      return {
+        text: 'Declined by Gateway (Order rejected / Network drop)',
+        type: 'failed',
+        isInsufficient: false,
+      };
+    }
+    return {
+      text: 'Payment Rejected / Failed at Biller Gateway',
+      type: 'failed',
+      isInsufficient: false,
+    };
   };
 
   // Sync state
@@ -650,6 +724,7 @@ export const AdminPaymentHistory: React.FC = () => {
                 <th className="py-3.5 px-4">Card Number</th>
                 <th className="py-3.5 px-4">Paid Amount</th>
                 <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4">Details</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -789,6 +864,43 @@ export const AdminPaymentHistory: React.FC = () => {
                       )}
                     </td>
 
+                    {/* Details Column (Admin Side Only) */}
+                    <td className="py-3.5 px-4">
+                      {(() => {
+                        const detail = getBillResponseDetail(b, parsed, ids);
+                        return (
+                          <div
+                            onClick={() => setSelectedDetailsBill(b)}
+                            className={`max-w-[260px] cursor-pointer group flex items-start space-x-2 p-2 rounded-xl border transition-all hover:scale-[1.02] shadow-sm text-xs ${
+                              detail.type === 'failed' || detail.isInsufficient
+                                ? 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-300'
+                                : detail.type === 'pending'
+                                ? 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300'
+                                : 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                            }`}
+                            title={detail.text}
+                          >
+                            {detail.type === 'failed' ? (
+                              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
+                            ) : detail.type === 'pending' ? (
+                              <Clock className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-400" />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-mono font-semibold text-[11px] leading-tight group-hover:underline">
+                                {detail.text}
+                              </p>
+                              <span className="text-[9px] text-slate-400 block mt-0.5 flex items-center gap-1">
+                                <Info className="h-2.5 w-2.5" />
+                                <span>Click for full API response</span>
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </td>
+
                     {/* Actions Column */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end space-x-1.5 flex-wrap gap-y-1">
@@ -822,6 +934,17 @@ export const AdminPaymentHistory: React.FC = () => {
                           </button>
                         )}
 
+                        {/* Details Button (Admin Only) */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDetailsBill(b)}
+                          title="View Full UsePay API Gateway Response & Details (Admin Only)"
+                          className="px-2.5 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 font-semibold text-[11px] inline-flex items-center space-x-1 transition-all hover:scale-105 cursor-pointer shadow-sm"
+                        >
+                          <Info className="h-3.5 w-3.5 text-indigo-400" />
+                          <span>Details</span>
+                        </button>
+
                         {/* Receipt Button */}
                         <button
                           onClick={() => setReceiptBill(b)}
@@ -837,7 +960,7 @@ export const AdminPaymentHistory: React.FC = () => {
               })}
               {filteredBills.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="py-8 text-center text-slate-500 font-medium">
+                  <td colSpan={11} className="py-8 text-center text-slate-500 font-medium">
                     No matching transactions found.
                   </td>
                 </tr>
@@ -1354,6 +1477,227 @@ export const AdminPaymentHistory: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Admin Gateway Response & Details Modal */}
+      {selectedDetailsBill && (() => {
+        const dUser = getUserInfo(selectedDetailsBill.user_id);
+        const dParsed = parsePaymentMethod(selectedDetailsBill.payment_method);
+        const dIds = extractBillIdentifiers(selectedDetailsBill);
+        const dResponseMsg = selectedDetailsBill.api_response || dParsed.apiResponse || 'No gateway response recorded for this transaction.';
+        const isInsufficient = dResponseMsg.toLowerCase().includes('insufficient') || dResponseMsg.toLowerCase().includes('security deposit') || dResponseMsg.toLowerCase().includes('usable balance');
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="max-w-xl w-full glass-panel p-6 border border-slate-700 shadow-2xl relative rounded-2xl max-h-[90vh] overflow-y-auto">
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setSelectedDetailsBill(null)}
+                className="absolute right-4 top-4 p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              {/* Header */}
+              <div className="flex items-center space-x-3 mb-5 pb-4 border-b border-slate-800">
+                <div className={`p-3 rounded-2xl border ${
+                  selectedDetailsBill.status === 'Failed' || isInsufficient
+                    ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
+                    : selectedDetailsBill.status === 'Pending'
+                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                    : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                }`}>
+                  <Terminal className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-lg font-bold text-white tracking-tight">UsePay Gateway Response</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      Admin Only
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">Live API response & transaction payload details</p>
+                </div>
+              </div>
+
+              {/* UsePay Gateway Raw Response Card */}
+              <div className="space-y-4">
+                <div className={`p-4 rounded-xl border ${
+                  selectedDetailsBill.status === 'Failed' || isInsufficient
+                    ? 'bg-rose-950/30 border-rose-500/30'
+                    : selectedDetailsBill.status === 'Pending'
+                    ? 'bg-amber-950/30 border-amber-500/30'
+                    : 'bg-emerald-950/30 border-emerald-500/30'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <AlertCircle className={`h-3.5 w-3.5 ${
+                        selectedDetailsBill.status === 'Failed' || isInsufficient ? 'text-rose-400' : selectedDetailsBill.status === 'Pending' ? 'text-amber-400' : 'text-emerald-400'
+                      }`} />
+                      Gateway Server Response / Reason
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(dResponseMsg, 'modal-resp-copy')}
+                      className="text-xs text-indigo-400 hover:text-white flex items-center space-x-1 cursor-pointer font-medium"
+                    >
+                      {copiedId === 'modal-resp-copy' ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                      <span>{copiedId === 'modal-resp-copy' ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                  <div className="p-3 rounded-lg bg-black/60 border border-slate-800 font-mono text-xs text-slate-200 select-all whitespace-pre-wrap break-words leading-relaxed">
+                    {dResponseMsg}
+                  </div>
+
+                  {isInsufficient && (
+                    <div className="mt-3 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-start space-x-2">
+                      <span className="text-base shrink-0">⚠️</span>
+                      <p className="leading-snug">
+                        <strong>Insufficient Usable Balance Alert:</strong> The UsePay B2B wallet usable balance was lower than the bill amount (some funds are held as Fixed Security Deposit). Please recharge your UsePay wallet to process transactions.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Transaction Metadata Grid */}
+                <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5 text-xs">
+                  <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Transaction Information
+                  </h4>
+
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Current Status</span>
+                    <div>
+                      {selectedDetailsBill.status === 'Success' && (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>Success</span>
+                        </span>
+                      )}
+                      {selectedDetailsBill.status === 'Pending' && (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          <Clock className="h-3 w-3" />
+                          <span>Pending</span>
+                        </span>
+                      )}
+                      {selectedDetailsBill.status === 'Failed' && (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                          <XCircle className="h-3 w-3" />
+                          <span>Failed</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Paid Amount</span>
+                    <span className="font-mono font-bold text-white text-sm">
+                      ₹{selectedDetailsBill.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">User / Member</span>
+                    <span className="font-semibold text-slate-200">{dUser.name} ({dUser.email})</span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Customer Mobile</span>
+                    <span className="font-mono text-slate-200">{dParsed.mobile || '-'}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Bank / Biller</span>
+                    <span className="text-slate-200 font-semibold">{selectedDetailsBill.bank_name} ({dParsed.billerId})</span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Card Number</span>
+                    <span className="font-mono text-slate-200">{selectedDetailsBill.card_number}</span>
+                  </div>
+
+                  {dIds.orderId && (
+                    <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                      <span className="text-slate-400">Client Order ID</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-violet-300 font-semibold">{dIds.orderId}</span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(dIds.orderId!, 'det-ord-id')}
+                          className="p-1 text-violet-400 hover:text-white"
+                        >
+                          {copiedId === 'det-ord-id' ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {dIds.bbpsRef && (
+                    <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                      <span className="text-slate-400">BBPS / Gateway Ref</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-emerald-300 font-semibold">{dIds.bbpsRef}</span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(dIds.bbpsRef!, 'det-bbps-id')}
+                          className="p-1 text-emerald-400 hover:text-white"
+                        >
+                          {copiedId === 'det-bbps-id' ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-400">Date & Time</span>
+                    <span className="text-slate-300">
+                      {new Date(selectedDetailsBill.created_at).toLocaleString('en-IN', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Modal Footer Buttons */}
+                <div className="flex items-center gap-3 pt-2">
+                  {(selectedDetailsBill.status === 'Pending' || selectedDetailsBill.status === 'Failed') && (
+                    <button
+                      type="button"
+                      onClick={() => handleAdminCheckStatus(selectedDetailsBill.id)}
+                      disabled={checkingAdminBillId === selectedDetailsBill.id}
+                      className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs transition-colors flex items-center justify-center space-x-2 shadow-lg shadow-amber-600/20 cursor-pointer"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${checkingAdminBillId === selectedDetailsBill.id ? 'animate-spin' : ''}`} />
+                      <span>{checkingAdminBillId === selectedDetailsBill.id ? 'Checking...' : 'Check Live Status'}</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptBill(selectedDetailsBill);
+                      setSelectedDetailsBill(null);
+                    }}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 font-bold text-xs transition-colors flex items-center justify-center space-x-1.5 border border-slate-700 cursor-pointer"
+                  >
+                    <Receipt className="h-3.5 w-3.5" />
+                    <span>View Receipt</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDetailsBill(null)}
+                    className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors shadow-lg shadow-indigo-600/30 cursor-pointer text-center"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

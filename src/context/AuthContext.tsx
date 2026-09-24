@@ -11,7 +11,7 @@ import {
   saveMaintenance,
   fetchAllSupabaseRows,
 } from '../lib/supabase';
-import { extractBillIdentifiers, resolveGatewayStatus } from '../utils/billUtils';
+import { extractBillIdentifiers, resolveGatewayStatus, parsePaymentMethod } from '../utils/billUtils';
 
 const MOCK_B2B_CONFIG_KEY = 'zentopay_b2b_config';
 
@@ -249,7 +249,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const billsData = await fetchAllSupabaseRows<CreditCardBill>('credit_card_bills', 'created_at', false);
       if (billsData && billsData.length > 0) {
-        setBills(billsData);
+        let storedResponses: Record<string, string> = {};
+        try {
+          storedResponses = JSON.parse(localStorage.getItem('zentopay_api_responses') || '{}');
+        } catch {}
+        const enrichedBills = billsData.map((b) => {
+          const parsed = parsePaymentMethod(b.payment_method);
+          const cachedResponse =
+            (b.transaction_ref && storedResponses[b.transaction_ref]) ||
+            (parsed.clientTxnId && storedResponses[parsed.clientTxnId]) ||
+            storedResponses[b.id];
+          return {
+            ...b,
+            api_response: b.api_response || parsed.apiResponse || cachedResponse,
+          };
+        });
+        setBills(enrichedBills);
       }
 
       const { data: settingsData } = await supabase
@@ -908,25 +923,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       console.log("<<< [UsePay API Response] RECEIVED:", resData);
 
-      if (!response.ok) {
-        networkOrTimeoutError = new Error(`HTTP ${response.status}: ${resData?.message || response.statusText || 'Gateway timeout or server error'}`);
+      if (!response.ok && !resData) {
+        networkOrTimeoutError = new Error(`HTTP ${response.status}: ${response.statusText || 'Gateway timeout or server error'}`);
       }
     } catch (fetchErr: any) {
       console.error('UsePay Network/Fetch Error:', fetchErr);
       networkOrTimeoutError = fetchErr;
     }
 
-    // 1. Timeout / Network Failure Protection (NEVER SKIP ENTRY)
-    if (networkOrTimeoutError || !resData) {
-      console.warn(">>> [payBill] Network timeout or connection drop detected. Creating PENDING transaction with Client Order ID:", clientTxnId);
+    // 1. Timeout / Network Failure Protection (ONLY WHEN NO RESPONSE WAS RECEIVED)
+    if (!resData && networkOrTimeoutError) {
+      console.warn(">>> [payBill] Network timeout or connection drop detected (no response body). Creating PENDING transaction with Client Order ID:", clientTxnId);
       const pendingBill: CreditCardBill = {
         ...billData,
         id: `b-${Date.now()}`,
         status: 'Pending',
         transaction_ref: clientTxnId,
         created_at: new Date().toISOString(),
-        payment_method: `${billData.payment_method}|${billerId}|${userPhone}|${clientTxnId}`,
+        payment_method: `${billData.payment_method}|${billerId}|${userPhone}|${clientTxnId}|Network Timeout (No response from gateway)`,
         client_transaction_id: clientTxnId,
+        api_response: 'Network Timeout (No response from gateway)',
       };
 
       setBills((prev) => [pendingBill, ...prev.filter(b => b.id !== pendingBill.id)]);
@@ -956,59 +972,100 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 2. Gateway Response Handling
-    const extError = resData.ExtBillPayResponse?.errorInfo?.error?.errorMessage;
-    const gatewayError = resData.message || resData.data?.message;
-    const apiTxnId = resData.transaction_id || resData.data?.billPayResponse?.txnReferenceId;
-    const approvalRef = resData.ExtBillPayResponse?.approvalRefNumber;
+    const extError = resData?.ExtBillPayResponse?.errorInfo?.error?.errorMessage;
+    const gatewayError = resData?.message || resData?.data?.message || resData?.error;
+    const apiTxnId = resData?.transaction_id || resData?.data?.billPayResponse?.txnReferenceId;
+    const approvalRef = resData?.ExtBillPayResponse?.approvalRefNumber;
     const baseRef = apiTxnId || clientTxnId;
     const finalRef = approvalRef ? `${baseRef} (Approval: ${approvalRef})` : baseRef;
 
-    const isApiError = resData.status === 'error' || resData.status === 'failed' || resData.payment_status === 'failed' || Boolean(extError);
+    const fullResponseMsg: string = (
+      (typeof gatewayError === 'string' ? gatewayError : (extError || '')) ||
+      resData?.status_message ||
+      (networkOrTimeoutError?.message || '')
+    ).trim();
 
-    // If API returned error/failure, save as 'Pending' so status check can query and resolve it live
-    if (isApiError) {
-      console.warn(">>> [payBill] Gateway returned failure/pending message. Saving as 'Pending' for live verification:", extError || gatewayError);
-      const pendingBill: CreditCardBill = {
+    // Check for Insufficient Usable Balance / Gateway Rejection
+    const lowerMsg = fullResponseMsg.toLowerCase();
+    const isInsufficientBalance =
+      lowerMsg.includes('insufficient') ||
+      lowerMsg.includes('security deposit') ||
+      lowerMsg.includes('usable balance');
+
+    const isDefinitiveFailure =
+      isInsufficientBalance ||
+      resData?.status === 'error' ||
+      resData?.status === 'failed' ||
+      resData?.status === false ||
+      resData?.payment_status === 'failed' ||
+      resData?.payment_status === 'error' ||
+      resData?.success === false ||
+      Boolean(extError) ||
+      resolveGatewayStatus(resData?.data || resData, 'Pending') === 'Failed';
+
+    // If API returned error/failure/insufficient balance, save as 'Failed' (NEVER leave as Pending)
+    if (isDefinitiveFailure) {
+      console.warn(">>> [payBill] Gateway rejected payment. Saving entry as 'Failed':", fullResponseMsg);
+      const sanitizedResponse = fullResponseMsg.replace(/\|/g, ' ').trim() || 'Transaction rejected by UsePay gateway.';
+      const updatedPaymentMethod = `${billData.payment_method}|${billerId}|${userPhone}|${clientTxnId}|${sanitizedResponse}`;
+
+      try {
+        const stored = JSON.parse(localStorage.getItem('zentopay_api_responses') || '{}');
+        stored[clientTxnId] = sanitizedResponse;
+        stored[finalRef] = sanitizedResponse;
+        localStorage.setItem('zentopay_api_responses', JSON.stringify(stored));
+      } catch {}
+
+      const failedBill: CreditCardBill = {
         ...billData,
         id: `b-${Date.now()}`,
-        status: 'Pending',
+        status: 'Failed',
         transaction_ref: finalRef,
         created_at: new Date().toISOString(),
-        payment_method: `${billData.payment_method}|${billerId}|${userPhone}|${clientTxnId}`,
+        payment_method: updatedPaymentMethod,
         client_transaction_id: clientTxnId,
         api_transaction_id: apiTxnId || undefined,
         bbps_ref_id: approvalRef || undefined,
+        api_response: sanitizedResponse,
       };
 
-      setBills((prev) => [pendingBill, ...prev.filter(b => b.id !== pendingBill.id)]);
+      setBills((prev) => [failedBill, ...prev.filter(b => b.id !== failedBill.id)]);
 
       if (isSupabaseConfigured && supabase) {
         try {
           const { error } = await supabase.from('credit_card_bills').upsert({
-            user_id: pendingBill.user_id,
-            card_number: pendingBill.card_number,
-            cardholder_name: pendingBill.cardholder_name,
-            bank_name: pendingBill.bank_name,
-            amount: pendingBill.amount,
-            status: pendingBill.status,
-            transaction_ref: pendingBill.transaction_ref,
-            payment_method: pendingBill.payment_method,
-            created_at: pendingBill.created_at,
+            user_id: failedBill.user_id,
+            card_number: failedBill.card_number,
+            cardholder_name: failedBill.cardholder_name,
+            bank_name: failedBill.bank_name,
+            amount: failedBill.amount,
+            status: failedBill.status,
+            transaction_ref: failedBill.transaction_ref,
+            payment_method: failedBill.payment_method,
+            created_at: failedBill.created_at,
           }, { onConflict: 'transaction_ref' });
           if (error) {
-            console.error("Supabase upsert error for pending bill:", error);
+            console.error("Supabase upsert error for failed bill:", error);
           }
         } catch (dbErr) {
-          console.error("Failed to insert pending bill to Supabase:", dbErr);
+          console.error("Failed to insert failed bill to Supabase:", dbErr);
         }
       }
 
-      return pendingBill;
+      return failedBill;
     }
 
     // 3. Normal / Success API Response
     const resolvedStatus = resolveGatewayStatus(resData?.data || resData, 'Success');
-    const initialStatus: TransactionStatus = resolvedStatus === 'Pending' ? 'Pending' : 'Success';
+    const initialStatus: TransactionStatus = resolvedStatus === 'Pending' ? 'Pending' : (resolvedStatus === 'Failed' ? 'Failed' : 'Success');
+    const sanitizedResponse = fullResponseMsg.replace(/\|/g, ' ').trim() || (initialStatus === 'Success' ? 'Payment processed successfully' : 'Processing at biller bank');
+
+    try {
+      const stored = JSON.parse(localStorage.getItem('zentopay_api_responses') || '{}');
+      stored[clientTxnId] = sanitizedResponse;
+      stored[finalRef] = sanitizedResponse;
+      localStorage.setItem('zentopay_api_responses', JSON.stringify(stored));
+    } catch {}
 
     const newBill: CreditCardBill = {
       ...billData,
@@ -1016,10 +1073,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       status: initialStatus,
       transaction_ref: finalRef,
       created_at: new Date().toISOString(),
-      payment_method: `${billData.payment_method}|${billerId}|${userPhone}|${clientTxnId}`,
+      payment_method: `${billData.payment_method}|${billerId}|${userPhone}|${clientTxnId}|${sanitizedResponse}`,
       client_transaction_id: clientTxnId,
       api_transaction_id: apiTxnId || undefined,
       bbps_ref_id: approvalRef || undefined,
+      api_response: sanitizedResponse,
     };
 
     setBills((prev) => [newBill, ...prev.filter(b => b.id !== newBill.id)]);
@@ -1539,19 +1597,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedTxnRef = returnedClientOrderId;
     }
 
-    // Ensure payment_method stores the 4th pipe for clientTxnId so it persists in Supabase
+    const statusMsg = (
+      statusData.message ||
+      (statusData.reason ? `${statusData.reason}` : '') ||
+      (statusData.status_message ? `${statusData.status_message}` : '') ||
+      `Gateway status: ${newStatus}`
+    ).trim();
+    const sanitizedStatusMsg = statusMsg.replace(/\|/g, ' ').trim();
+
+    // Ensure payment_method stores clientTxnId in 4th pipe and sanitizedStatusMsg in 5th pipe
     let updatedPaymentMethod = bill.payment_method;
+    const parts = (updatedPaymentMethod || '').split('|');
+    parts[0] = parts[0] || 'UPI / NetBanking';
+    parts[1] = parts[1] || 'N/A';
+    parts[2] = parts[2] || 'N/A';
     if (returnedClientOrderId) {
-      if (updatedPaymentMethod && updatedPaymentMethod.includes('|')) {
-        const parts = updatedPaymentMethod.split('|');
-        if (!parts[3] || parts[3] !== returnedClientOrderId) {
-          parts[3] = returnedClientOrderId;
-          updatedPaymentMethod = parts.join('|');
-        }
-      } else if (updatedPaymentMethod) {
-        updatedPaymentMethod = `${updatedPaymentMethod}|||${returnedClientOrderId}`;
-      }
+      parts[3] = returnedClientOrderId;
     }
+    if (sanitizedStatusMsg) {
+      parts[4] = sanitizedStatusMsg;
+    }
+    updatedPaymentMethod = parts.join('|');
+
+    try {
+      const stored = JSON.parse(localStorage.getItem('zentopay_api_responses') || '{}');
+      if (returnedClientOrderId) stored[returnedClientOrderId] = sanitizedStatusMsg;
+      if (updatedTxnRef) stored[updatedTxnRef] = sanitizedStatusMsg;
+      stored[bill.id] = sanitizedStatusMsg;
+      localStorage.setItem('zentopay_api_responses', JSON.stringify(stored));
+    } catch {}
 
     // Update in state
     setBills((prev) =>
@@ -1565,6 +1639,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               api_transaction_id: returnedApiTxnId,
               bbps_ref_id: returnedBbpsRef,
               client_transaction_id: returnedClientOrderId,
+              api_response: sanitizedStatusMsg,
             }
           : b
       )
